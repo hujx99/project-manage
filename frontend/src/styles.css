@@ -1,0 +1,25 @@
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+}
+
+.page-card {
+  margin-bottom: 16px;
+}
+
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.action-left {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}

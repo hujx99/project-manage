@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /root/projrct-main -name \".gitignore\" -o -name \"nginx.conf\" | xargs ls -la 2>/dev/null)",
+      "Bash(wc -l /root/projrct-main/frontend/src/pages/*.tsx /root/projrct-main/backend/app/routers/*.py)",
+      "Bash(docker compose up --build 2>&1 | head -200)",
+      "Bash(docker compose up --build 2>&1)",
+      "Bash(docker compose down 2>&1; docker ps -a --filter \"name=projrct\" -q | xargs -r docker rm -f 2>&1)",
+      "Bash(find /root/projrct-main -name \"*.css\" -o -name \".env*\" 2>/dev/null | head -20)",
+      "Bash(python3 -c \"import sys; print\\(f'Python: {sys.version}'\\)\" 2>&1)",
+      "Bash(python3 -m py_compile /root/projrct-main/backend/app/main.py /root/projrct-main/backend/app/models.py /root/projrct-main/backend/app/database.py /root/projrct-main/backend/app/schemas.py 2>&1)",
+      "Bash(python3 -m py_compile /root/projrct-main/backend/app/routers/dashboard.py /root/projrct-main/backend/app/routers/projects.py /root/projrct-main/backend/app/routers/contracts.py /root/projrct-main/backend/app/routers/payments.py /root/projrct-main/backend/app/routers/imports.py /root/projrct-main/backend/app/routers/exports.py /root/projrct-main/backend/app/services/ai_parser.py 2>&1)",
+      "Bash(grep -n \"localhost\" /root/projrct-main/frontend/src/pages/*.tsx | head -10)",
+      "Bash(ss -tlnp | grep ':80\\\\b')",
+      "Bash(docker compose down 2>&1 && docker compose up --build -d 2>&1)",
+      "Bash(ss -tlnp | grep -E ':\\(80|8080|8000|3000|5173\\)\\\\b')",
+      "Bash(docker compose down 2>&1 && docker compose up -d 2>&1)",
+      "Bash(cd /root/projrct-main/frontend && npm install dayjs)",
+      "Bash(find /root/projrct-main/frontend/src -name \"*.tsx\" -o -name \"*.ts\" | xargs ls -lt --time=ctime 2>/dev/null | head -20)",
+      "Bash(find /root/projrct-main/backend -name \"*.py\" | xargs ls -lt --time=ctime 2>/dev/null | head -20)",
+      "Bash(docker compose up --build -d)"
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: contract-backend
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./backend:/app/backend
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: contract-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '8081:80'
