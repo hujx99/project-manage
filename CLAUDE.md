@@ -46,8 +46,8 @@ No test framework is configured. No linter is configured.
 ### Frontend (`frontend/src/`)
 - **React 18 + TypeScript + Ant Design 5** (Chinese locale zh_CN)
 - **Vite** for bundling, React Router v6 for routing
-- **api/client.ts** — Axios instance, base URL `/api`
-- **store.tsx** — Context API state management
+- **api/client.ts** — Axios instance; base URL is `http://localhost:8000/api` in dev (`import.meta.env.DEV`), `/api` in prod
+- **services/** — thin API wrappers over axios (projects.ts, contracts.ts, payments.ts, dashboard.ts)
 - **pages/** — DashboardPage, ProjectsPage, ProjectDetailPage, ContractsPage, ContractDetailPage, PaymentsPage, ImportsPage
 
 ### Deployment
@@ -59,8 +59,11 @@ No test framework is configured. No linter is configured.
 - All monetary values use DECIMAL(14, 2)
 - Dates in ISO format (YYYY-MM-DD)
 - `project_code` and `contract_code` are unique at DB level
-- Payment `pending_amount` = `planned_amount - actual_amount`
+- Payment `pending_amount` = `planned_amount - actual_amount`, auto-calculated server-side on PUT
 - API errors return `{"message": "..."}`, validation errors include `"errors"` array
 - Projects endpoint supports pagination (page, page_size query params)
 - Contract creation accepts nested items and payments in a single POST
-- ANTHROPIC_API_KEY configured via `.env` file for AI screenshot parsing
+- Contract detail/create responses may include a `warnings` array (e.g., item sum ≠ contract amount, paid total > contract amount)
+- FK relationships use RESTRICT: deleting a Project with contracts, or a Contract with payments/items, returns a 400 error
+- ANTHROPIC_API_KEY configured via `.env` file for AI screenshot parsing; `services/ai_parser.py` uses model `claude-sonnet-4`
+- CORS in `main.py` only allows `http://localhost:5173` — update if running the frontend on a different port

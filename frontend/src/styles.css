@@ -53,8 +53,8 @@ body {
 
 .shell-brand.is-collapsed {
   justify-content: center;
-  min-height: 84px;
-  padding: 16px 0 12px;
+  min-height: 76px;
+  padding: 14px 0 10px;
 }
 
 .shell-brand-badge {
@@ -108,7 +108,7 @@ body {
 
 .shell-sider .ant-menu-inline-collapsed {
   width: 100%;
-  padding: 10px 0 16px !important;
+  padding: 8px 0 14px !important;
 }
 
 .shell-sider .ant-menu-item,
@@ -133,7 +133,12 @@ body {
 
 .shell-sider .ant-menu-inline-collapsed > .ant-menu-item,
 .shell-sider .ant-menu-inline-collapsed > .ant-menu-submenu > .ant-menu-submenu-title {
-  width: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
   margin-inline: auto;
   padding-inline: 0 !important;
 }
@@ -141,7 +146,8 @@ body {
 .shell-sider .ant-menu-inline-collapsed > .ant-menu-item .anticon,
 .shell-sider .ant-menu-inline-collapsed > .ant-menu-submenu > .ant-menu-submenu-title .anticon {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
+  line-height: 1;
 }
 
 .shell-sider .ant-menu-title-content {
@@ -281,6 +287,13 @@ body {
   margin-top: 6px;
 }
 
+.settings-stack,
+.settings-stack > .ant-space-item,
+.settings-form-stack,
+.settings-form-stack > .ant-space-item {
+  width: 100%;
+}
+
 .page-panel .ant-table-wrapper {
   width: 100%;
   overflow-x: auto;
@@ -292,6 +305,15 @@ body {
 
 .page-panel .ant-table-cell {
   white-space: nowrap;
+}
+
+.page-panel .table-link-ellipsis {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .page-panel .ant-card,

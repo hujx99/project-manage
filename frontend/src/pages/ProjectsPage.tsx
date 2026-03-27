@@ -320,9 +320,15 @@ const ProjectsPage = () => {
         title: T.colName,
         dataIndex: 'project_name',
         key: 'project_name',
+        width: 420,
+        ellipsis: true,
         sorter: true,
         sortOrder: settings.sortField === 'project_name' ? settings.sortOrder : undefined,
-        render: (_value: unknown, record: Project) => <Link to={`/projects/${record.id}`}>{record.project_name}</Link>,
+        render: (_value: unknown, record: Project) => (
+          <Link to={`/projects/${record.id}`} className="table-link-ellipsis" title={record.project_name}>
+            {record.project_name}
+          </Link>
+        ),
       },
       {
         title: T.colType,
@@ -517,7 +523,7 @@ const ProjectsPage = () => {
           </Space>
         }
       >
-        <Space direction="vertical" size={20} style={{ width: '100%' }}>
+        <Space direction="vertical" size={20} style={{ width: '100%' }} className="settings-stack">
           <div>
             <Typography.Text strong>{T.sectionColumns}</Typography.Text>
             <Divider style={{ margin: '10px 0 14px' }} />
@@ -537,8 +543,9 @@ const ProjectsPage = () => {
           <div>
             <Typography.Text strong>{T.sectionSort}</Typography.Text>
             <Divider style={{ margin: '10px 0 14px' }} />
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space direction="vertical" style={{ width: '100%' }} className="settings-form-stack">
               <Select
+                style={{ width: '100%' }}
                 value={draftSettings.sortField}
                 options={SORT_OPTIONS}
                 onChange={(value: ProjectSortField) => {
@@ -549,6 +556,7 @@ const ProjectsPage = () => {
                 }}
               />
               <Select
+                style={{ width: '100%' }}
                 value={draftSettings.sortOrder}
                 options={[
                   { label: T.sortAsc, value: 'ascend' },
@@ -570,6 +578,7 @@ const ProjectsPage = () => {
             <Select
               mode="multiple"
               allowClear
+              style={{ width: '100%' }}
               placeholder={T.hiddenStatusPlaceholder}
               value={draftSettings.hiddenStatuses}
               options={PROJECT_STATUSES.map((item) => ({ label: item, value: item }))}

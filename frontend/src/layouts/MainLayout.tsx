@@ -49,7 +49,7 @@ const MainLayout = () => {
         trigger={null}
         collapsed={collapsed}
         width={240}
-        collapsedWidth={88}
+        collapsedWidth={76}
         className="shell-sider"
       >
         <div className={`shell-brand ${collapsed ? 'is-collapsed' : ''}`}>

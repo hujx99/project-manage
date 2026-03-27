@@ -18,7 +18,8 @@
       "Bash(cd /root/projrct-main/frontend && npm install dayjs)",
       "Bash(find /root/projrct-main/frontend/src -name \"*.tsx\" -o -name \"*.ts\" | xargs ls -lt --time=ctime 2>/dev/null | head -20)",
       "Bash(find /root/projrct-main/backend -name \"*.py\" | xargs ls -lt --time=ctime 2>/dev/null | head -20)",
-      "Bash(docker compose up --build -d)"
+      "Bash(docker compose up --build -d)",
+      "Bash(wc -l backend/app/*.py frontend/src/**/*.tsx frontend/src/**/*.ts)"
     ]
   }
 }
