@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .database import Base, engine
-from .routers import contracts, dashboard, exports, imports, payments, projects
+from .routers import contracts, payments, projects
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ app = FastAPI(title="项目合同付款管理系统 API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost"],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,9 +41,9 @@ async def validation_exception_handler(_: Request, exc: RequestValidationError):
 
 @app.exception_handler(IntegrityError)
 async def integrity_error_handler(_: Request, exc: IntegrityError):
-    """统一处理唯一键等数据库约束错误。"""
+    """统一处理数据库约束异常。"""
     logger.warning("数据库约束冲突: %s", exc)
-    return JSONResponse(status_code=400, content={"message": "数据冲突：请检查唯一编号或关联关系"})
+    return JSONResponse(status_code=400, content={"message": "数据冲突，请检查唯一编号或关联数据"})
 
 
 @app.exception_handler(SQLAlchemyError)
@@ -57,15 +57,12 @@ async def sqlalchemy_exception_handler(_: Request, exc: SQLAlchemyError):
 async def unhandled_exception_handler(_: Request, exc: Exception):
     """兜底处理未捕获异常。"""
     logger.exception("未处理异常: %s", exc)
-    return JSONResponse(status_code=500, content={"message": "服务器内部错误，请联系管理员"})
+    return JSONResponse(status_code=500, content={"message": "服务器内部错误"})
 
 
 app.include_router(projects.router)
 app.include_router(contracts.router)
 app.include_router(payments.router)
-app.include_router(imports.router)
-app.include_router(exports.router)
-app.include_router(dashboard.router)
 
 
 @app.get("/")

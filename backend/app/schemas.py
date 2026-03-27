@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -39,6 +39,13 @@ class ProjectResponse(ProjectBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[ProjectResponse]
 
 
 class ContractItemBase(BaseModel):
@@ -200,10 +207,3 @@ class ContractResponse(ContractBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AIScreenshotParseResponse(BaseModel):
-    parsed_data: dict[str, Any]
-    uncertain_fields: list[str] = Field(default_factory=list)
-
-
-class AIScreenshotConfirmRequest(BaseModel):
-    parsed_data: dict[str, Any]

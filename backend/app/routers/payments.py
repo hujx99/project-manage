@@ -5,8 +5,8 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ..database import get_db
 from .. import models, schemas
+from ..database import get_db
 
 router = APIRouter(prefix="/api/payments", tags=["付款"])
 
@@ -25,6 +25,7 @@ def list_payments(
     contract_id: int | None = Query(default=None, description="按合同筛选"),
     db: Session = Depends(get_db),
 ):
+    """查询付款列表。"""
     query = db.query(models.Payment)
     if contract_id is not None:
         query = query.filter(models.Payment.contract_id == contract_id)
@@ -33,6 +34,7 @@ def list_payments(
 
 @router.get("/{payment_id}", response_model=schemas.PaymentResponse)
 def get_payment(payment_id: int, db: Session = Depends(get_db)):
+    """查询付款详情。"""
     entity = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="付款记录不存在")
@@ -41,6 +43,7 @@ def get_payment(payment_id: int, db: Session = Depends(get_db)):
 
 @router.post("", response_model=schemas.PaymentResponse)
 def create_payment(payload: schemas.PaymentCreate, db: Session = Depends(get_db)):
+    """创建付款记录。"""
     contract = db.query(models.Contract).filter(models.Contract.id == payload.contract_id).first()
     if not contract:
         raise HTTPException(status_code=400, detail="所属合同不存在")
@@ -56,6 +59,7 @@ def create_payment(payload: schemas.PaymentCreate, db: Session = Depends(get_db)
 
 @router.put("/{payment_id}", response_model=schemas.PaymentResponse)
 def update_payment(payment_id: int, payload: schemas.PaymentUpdate, db: Session = Depends(get_db)):
+    """更新付款记录。"""
     entity = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="付款记录不存在")
@@ -78,6 +82,7 @@ def update_payment(payment_id: int, payload: schemas.PaymentUpdate, db: Session 
 
 @router.delete("/{payment_id}")
 def delete_payment(payment_id: int, db: Session = Depends(get_db)):
+    """删除付款记录。"""
     entity = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="付款记录不存在")
