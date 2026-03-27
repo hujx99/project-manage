@@ -9,19 +9,41 @@ from ..database import get_db
 
 router = APIRouter(prefix="/api/projects", tags=["项目"])
 
+PROJECT_SORT_FIELDS = {
+    "project_code": models.Project.project_code,
+    "project_name": models.Project.project_name,
+    "project_type": models.Project.project_type,
+    "start_date": models.Project.start_date,
+    "status": models.Project.status,
+    "budget": models.Project.budget,
+    "manager": models.Project.manager,
+    "created_at": models.Project.created_at,
+    "updated_at": models.Project.updated_at,
+}
+
 
 @router.get("", response_model=schemas.ProjectListResponse)
 def list_projects(
     status: str | None = Query(default=None, description="按状态筛选"),
+    exclude_statuses: str | None = Query(default=None, description="排除的状态，多个用逗号分隔"),
     search: str | None = Query(default=None, description="按编号或名称搜索"),
+    sort_field: str = Query(default="start_date", description="排序字段"),
+    sort_order: str = Query(default="desc", pattern="^(asc|desc)$", description="排序方向"),
     page: int = Query(default=1, ge=1, description="页码，从 1 开始"),
     page_size: int = Query(default=10, ge=1, le=100, description="每页条数"),
     db: Session = Depends(get_db),
 ):
     """分页查询项目列表。"""
     query = db.query(models.Project)
+
     if status:
         query = query.filter(models.Project.status == status)
+
+    if exclude_statuses:
+        excluded_values = [item.strip() for item in exclude_statuses.split(",") if item.strip()]
+        if excluded_values:
+            query = query.filter(~models.Project.status.in_(excluded_values))
+
     if search:
         like_text = f"%{search}%"
         query = query.filter(
@@ -29,12 +51,13 @@ def list_projects(
         )
 
     total = query.count()
-    items = (
-        query.order_by(models.Project.id.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
+    sort_column = PROJECT_SORT_FIELDS.get(sort_field, models.Project.start_date)
+    if sort_order == "asc":
+        query = query.order_by(sort_column.asc(), models.Project.id.desc())
+    else:
+        query = query.order_by(sort_column.desc(), models.Project.id.desc())
+
+    items = query.offset((page - 1) * page_size).limit(page_size).all()
     return schemas.ProjectListResponse(total=total, page=page, page_size=page_size, items=items)
 
 

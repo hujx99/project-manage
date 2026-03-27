@@ -10,7 +10,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/data.db:/app/backend/data.db
+      - ./backend:/app/backend
 
   frontend:
     build:

@@ -15,6 +15,18 @@ from ..database import get_db
 
 router = APIRouter(prefix="/api/export", tags=["导出"])
 
+PROJECT_SORT_FIELDS = {
+    "project_code": models.Project.project_code,
+    "project_name": models.Project.project_name,
+    "project_type": models.Project.project_type,
+    "start_date": models.Project.start_date,
+    "status": models.Project.status,
+    "budget": models.Project.budget,
+    "manager": models.Project.manager,
+    "created_at": models.Project.created_at,
+    "updated_at": models.Project.updated_at,
+}
+
 
 def _safe_int(value: str | None, field_name: str) -> int | None:
     """安全转换整数参数。"""
@@ -33,6 +45,7 @@ def export_entity(
     format: str = Query(default="xlsx", pattern="^xlsx$"),
     db: Session = Depends(get_db),
 ):
+    """导出指定实体数据。"""
     if format != "xlsx":
         raise HTTPException(status_code=400, detail="仅支持 xlsx 导出")
 
@@ -42,17 +55,32 @@ def export_entity(
 
     if entity == "projects":
         status = request.query_params.get("status")
+        exclude_statuses = request.query_params.get("exclude_statuses")
         search = request.query_params.get("search")
+        sort_field = request.query_params.get("sort_field") or "start_date"
+        sort_order = request.query_params.get("sort_order") or "desc"
+
         query = db.query(models.Project)
         if status:
             query = query.filter(models.Project.status == status)
+        if exclude_statuses:
+            excluded_values = [item.strip() for item in exclude_statuses.split(",") if item.strip()]
+            if excluded_values:
+                query = query.filter(~models.Project.status.in_(excluded_values))
         if search:
             like_text = f"%{search}%"
             query = query.filter(
                 or_(models.Project.project_code.like(like_text), models.Project.project_name.like(like_text))
             )
-        data = query.order_by(models.Project.id.desc()).all()
-        ws.append(["项目编号", "项目名称", "项目属性", "状态", "预算", "负责人", "开始日期", "备注"])
+
+        sort_column = PROJECT_SORT_FIELDS.get(sort_field, models.Project.start_date)
+        if sort_order == "asc":
+            query = query.order_by(sort_column.asc(), models.Project.id.desc())
+        else:
+            query = query.order_by(sort_column.desc(), models.Project.id.desc())
+
+        data = query.all()
+        ws.append(["项目编号", "项目名称", "项目属性", "状态", "预算", "负责人", "立项时间", "备注"])
         for item in data:
             ws.append(
                 [
@@ -125,5 +153,5 @@ def export_entity(
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{entity}.xlsx"'},
+        headers={"Content-Disposition": f'attachment; filename=\"{entity}.xlsx\"'},
     )

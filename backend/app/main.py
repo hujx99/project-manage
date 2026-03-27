@@ -36,7 +36,10 @@ async def http_exception_handler(_: Request, exc: HTTPException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_: Request, exc: RequestValidationError):
     """统一返回请求参数校验错误。"""
-    return JSONResponse(status_code=422, content={"message": "请求参数校验失败", "errors": exc.errors()})
+    return JSONResponse(
+        status_code=422,
+        content={"message": "请求参数校验失败", "errors": exc.errors()},
+    )
 
 
 @app.exception_handler(IntegrityError)

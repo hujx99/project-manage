@@ -1,5 +1,6 @@
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../api/client';
@@ -17,6 +18,18 @@ const statusColorMap: Record<string, string> = {
   归档: 'success',
 };
 
+function compareText(a?: string | null, b?: string | null) {
+  return (a ?? '').localeCompare(b ?? '', 'zh-CN');
+}
+
+function compareNumber(a?: number | null, b?: number | null) {
+  return Number(a ?? 0) - Number(b ?? 0);
+}
+
+function compareDate(a?: string | null, b?: string | null) {
+  return dayjs(a ?? undefined).valueOf() - dayjs(b ?? undefined).valueOf();
+}
+
 const ContractsPage = () => {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -29,7 +42,10 @@ const ContractsPage = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [contractList, projectResult] = await Promise.all([fetchContracts(), fetchProjects({ page: 1, page_size: 1000 })]);
+      const [contractList, projectResult] = await Promise.all([
+        fetchContracts(),
+        fetchProjects({ page: 1, page_size: 100 }),
+      ]);
       setContracts(contractList);
       setProjects(projectResult.items);
     } catch (error) {
@@ -79,21 +95,47 @@ const ContractsPage = () => {
       title: '合同编号',
       dataIndex: 'contract_code',
       width: 220,
+      sorter: (a, b) => compareText(a.contract_code, b.contract_code),
       render: (_, record) => <Link to={`/contracts/${record.id}`}>{record.contract_code}</Link>,
     },
-    { title: '合同名称', dataIndex: 'contract_name' },
     {
-      title: '所属项目名称',
+      title: '合同名称',
+      dataIndex: 'contract_name',
+      sorter: (a, b) => compareText(a.contract_name, b.contract_name),
+    },
+    {
+      title: '所属项目',
       dataIndex: 'project_id',
       width: 220,
+      sorter: (a, b) => compareText(projectNameMap.get(a.project_id), projectNameMap.get(b.project_id)),
       render: (value: number) => projectNameMap.get(value) || '-',
     },
-    { title: '供应商', dataIndex: 'vendor', width: 220, render: (value) => value || '-' },
-    { title: '金额', dataIndex: 'amount', width: 140, render: (value) => `¥${Number(value).toLocaleString()}` },
+    {
+      title: '供应商',
+      dataIndex: 'vendor',
+      width: 220,
+      sorter: (a, b) => compareText(a.vendor, b.vendor),
+      render: (value) => value || '-',
+    },
+    {
+      title: '签订日期',
+      dataIndex: 'sign_date',
+      width: 140,
+      sorter: (a, b) => compareDate(a.sign_date, b.sign_date),
+      render: (value) => value || '-',
+    },
+    {
+      title: '金额',
+      dataIndex: 'amount',
+      width: 140,
+      sorter: (a, b) => compareNumber(a.amount, b.amount),
+      render: (value) => `¥${Number(value).toLocaleString()}`,
+    },
     {
       title: '状态',
       dataIndex: 'status',
       width: 120,
+      sorter: (a, b) => compareText(a.status, b.status),
       render: (value: string) => <Tag color={statusColorMap[value] ?? 'default'}>{value}</Tag>,
     },
   ];
@@ -104,7 +146,9 @@ const ContractsPage = () => {
         <Typography.Title level={3} style={{ marginBottom: 4 }}>
           合同管理
         </Typography.Title>
-        <Typography.Text type="secondary">按项目筛选合同，点击合同可进入详情页维护标的、付款和变更记录。</Typography.Text>
+        <Typography.Text type="secondary">
+          支持按项目筛选合同，表格列可排序，点击合同可进入详情页维护标的、付款和变更。
+        </Typography.Text>
       </div>
 
       <div className="page-panel" style={{ padding: 20 }}>
@@ -142,7 +186,7 @@ const ContractsPage = () => {
           </Space>
         </div>
 
-        <Table rowKey="id" dataSource={dataSource} columns={columns} loading={loading} />
+        <Table rowKey="id" dataSource={dataSource} columns={columns} loading={loading} scroll={{ x: 1200 }} />
       </div>
 
       <Modal

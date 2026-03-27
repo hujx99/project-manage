@@ -12,10 +12,12 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  width: 100%;
 }
 
 body {
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 * {
@@ -24,50 +26,204 @@ body {
 
 .shell-layout {
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .shell-sider {
   background:
     linear-gradient(180deg, #0f172a 0%, #162032 55%, #1f2937 100%) !important;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.shell-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
 .shell-brand {
-  padding: 22px 18px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 92px;
+  padding: 20px 18px 16px;
+  overflow: hidden;
+}
+
+.shell-brand.is-collapsed {
+  justify-content: center;
+  min-height: 84px;
+  padding: 16px 0 12px;
+}
+
+.shell-brand-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.32);
+  color: #eff6ff;
+  font-size: 14px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.shell-brand-copy {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .shell-brand-title {
   margin: 0 !important;
   color: #f8fafc !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .shell-brand-subtitle {
-  color: rgba(248, 250, 252, 0.68);
+  display: block;
+  margin-top: 4px;
+  color: rgba(248, 250, 252, 0.7);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-sider .ant-menu {
+  flex: 1;
+  min-width: 0;
+  background: transparent !important;
+  border-inline-end: none !important;
+  padding: 10px 8px 16px;
+}
+
+.shell-sider .ant-menu-inline-collapsed {
+  width: 100%;
+  padding: 10px 0 16px !important;
+}
+
+.shell-sider .ant-menu-item,
+.shell-sider .ant-menu-submenu-title {
+  width: calc(100% - 8px);
+  height: 48px;
+  line-height: 48px;
+  margin-inline: 0;
+  margin-block: 4px;
+  border-radius: 14px;
+}
+
+.shell-sider .ant-menu-item .anticon,
+.shell-sider .ant-menu-submenu-title .anticon {
+  font-size: 16px;
+}
+
+.shell-sider .ant-menu-item-selected {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
+}
+
+.shell-sider .ant-menu-inline-collapsed > .ant-menu-item,
+.shell-sider .ant-menu-inline-collapsed > .ant-menu-submenu > .ant-menu-submenu-title {
+  width: 56px;
+  margin-inline: auto;
+  padding-inline: 0 !important;
+}
+
+.shell-sider .ant-menu-inline-collapsed > .ant-menu-item .anticon,
+.shell-sider .ant-menu-inline-collapsed > .ant-menu-submenu > .ant-menu-submenu-title .anticon {
+  margin: 0;
+  font-size: 18px;
+}
+
+.shell-sider .ant-menu-title-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .shell-header {
   display: flex;
   align-items: center;
-  padding: 0 20px !important;
-  background: rgba(255, 255, 255, 0.78) !important;
+  min-height: 76px;
+  height: auto !important;
+  padding: 12px 20px !important;
+  background: rgba(255, 255, 255, 0.82) !important;
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 
+.shell-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+}
+
+.shell-header-trigger {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.shell-header-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .shell-header-title {
   margin: 0 !important;
-  font-size: 18px !important;
+  color: #0f172a !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-header-subtitle {
+  display: block;
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .shell-content {
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
   padding: 20px;
+  overflow-x: hidden;
 }
 
 .page-panel {
+  width: 100%;
+  min-width: 0;
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 20px;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
 }
 
 .action-bar {
@@ -99,6 +255,15 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+}
+
+.detail-stack > div {
+  min-width: 0;
+}
+
+.detail-stack .ant-typography {
+  word-break: break-word;
 }
 
 .inline-editor {
@@ -111,6 +276,40 @@ body {
   color: #64748b;
 }
 
+.settings-hint {
+  display: inline-block;
+  margin-top: 6px;
+}
+
+.page-panel .ant-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.page-panel .ant-table {
+  min-width: 100%;
+}
+
+.page-panel .ant-table-cell {
+  white-space: nowrap;
+}
+
+.page-panel .ant-card,
+.page-panel .ant-statistic {
+  min-width: 0;
+}
+
+.ant-modal .ant-form-item-label > label {
+  word-break: break-word;
+}
+
+.ant-select-selector,
+.ant-input,
+.ant-input-number,
+.ant-picker {
+  max-width: 100%;
+}
+
 @media (max-width: 1200px) {
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -118,8 +317,58 @@ body {
 }
 
 @media (max-width: 768px) {
+  .shell-layout {
+    overflow: visible;
+  }
+
+  .shell-brand {
+    min-height: 76px;
+    padding: 14px 12px;
+  }
+
+  .shell-brand-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .shell-brand.is-collapsed {
+    padding: 14px 0 10px;
+  }
+
+  .shell-header {
+    padding: 12px !important;
+  }
+
+  .shell-header-inner {
+    align-items: center;
+    gap: 10px;
+  }
+
+  .shell-header-copy {
+    gap: 4px;
+  }
+
+  .shell-header-title,
+  .shell-header-subtitle {
+    white-space: normal;
+  }
+
   .shell-content {
     padding: 12px;
+  }
+
+  .action-left,
+  .action-bar {
+    width: 100%;
+  }
+
+  .action-left > * {
+    width: 100%;
+  }
+
+  .page-panel .ant-table-cell {
+    white-space: normal;
   }
 
   .summary-grid {

@@ -16,7 +16,7 @@ client.interceptors.response.use(
     const message =
       error?.response?.data?.message ||
       error?.response?.data?.detail ||
-      '请求失败，请稍后重试';
+      '\u8bf7\u6c42\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5';
     return Promise.reject(new Error(message));
   },
 );

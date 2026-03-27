@@ -3,7 +3,10 @@ import type { Project, ProjectCreate, ProjectListResponse } from '../types';
 
 export async function fetchProjects(params?: {
   status?: string;
+  exclude_statuses?: string;
   search?: string;
+  sort_field?: string;
+  sort_order?: 'asc' | 'desc';
   page?: number;
   page_size?: number;
 }): Promise<ProjectListResponse> {

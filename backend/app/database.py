@@ -7,6 +7,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 DB_PATH = BACKEND_DIR / "data.db"
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # SQLite 需要关闭同线程检查，便于 FastAPI 多请求共享。

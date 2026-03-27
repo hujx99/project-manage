@@ -1,5 +1,6 @@
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../api/client';
 import { createPayment, deletePayment, fetchPayments } from '../services/payments';
@@ -12,7 +13,19 @@ interface PaymentRow extends Payment {
   contract_name: string;
 }
 
-const PAYMENT_STATUSES = ['未付', '已提交', '已付款'];
+const PAYMENT_STATUSES = ['未付', '已提报', '已付款'];
+
+function compareText(a?: string | null, b?: string | null) {
+  return (a ?? '').localeCompare(b ?? '', 'zh-CN');
+}
+
+function compareNumber(a?: number | null, b?: number | null) {
+  return Number(a ?? 0) - Number(b ?? 0);
+}
+
+function compareDate(a?: string | null, b?: string | null) {
+  return dayjs(a ?? undefined).valueOf() - dayjs(b ?? undefined).valueOf();
+}
 
 const PaymentsPage = () => {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -29,7 +42,7 @@ const PaymentsPage = () => {
     try {
       const [paymentList, projectResult, contractList] = await Promise.all([
         fetchPayments(),
-        fetchProjects({ page: 1, page_size: 1000 }),
+        fetchProjects({ page: 1, page_size: 100 }),
         fetchContracts(),
       ]);
 
@@ -102,18 +115,61 @@ const PaymentsPage = () => {
   };
 
   const columns: ColumnsType<PaymentRow> = [
-    { title: '项目名', dataIndex: 'project_name', width: 220 },
-    { title: '合同名', dataIndex: 'contract_name', width: 220 },
-    { title: '付款阶段', dataIndex: 'phase', width: 140, render: (value) => value || '-' },
-    { title: '计划日期', dataIndex: 'planned_date', width: 130, render: (value) => value || '-' },
-    { title: '计划金额', dataIndex: 'planned_amount', width: 130, render: (value) => `¥${Number(value ?? 0).toLocaleString()}` },
-    { title: '实际金额', dataIndex: 'actual_amount', width: 130, render: (value) => `¥${Number(value ?? 0).toLocaleString()}` },
-    { title: '待付款', dataIndex: 'pending_amount', width: 130, render: (value) => `¥${Number(value ?? 0).toLocaleString()}` },
+    {
+      title: '项目名称',
+      dataIndex: 'project_name',
+      width: 220,
+      sorter: (a, b) => compareText(a.project_name, b.project_name),
+    },
+    {
+      title: '合同名称',
+      dataIndex: 'contract_name',
+      width: 220,
+      sorter: (a, b) => compareText(a.contract_name, b.contract_name),
+    },
+    {
+      title: '付款阶段',
+      dataIndex: 'phase',
+      width: 140,
+      sorter: (a, b) => compareText(a.phase, b.phase),
+      render: (value) => value || '-',
+    },
+    {
+      title: '计划日期',
+      dataIndex: 'planned_date',
+      width: 130,
+      sorter: (a, b) => compareDate(a.planned_date, b.planned_date),
+      render: (value) => value || '-',
+    },
+    {
+      title: '计划金额',
+      dataIndex: 'planned_amount',
+      width: 130,
+      sorter: (a, b) => compareNumber(a.planned_amount, b.planned_amount),
+      render: (value) => `¥${Number(value ?? 0).toLocaleString()}`,
+    },
+    {
+      title: '实际金额',
+      dataIndex: 'actual_amount',
+      width: 130,
+      sorter: (a, b) => compareNumber(a.actual_amount, b.actual_amount),
+      render: (value) => `¥${Number(value ?? 0).toLocaleString()}`,
+    },
+    {
+      title: '待付款',
+      dataIndex: 'pending_amount',
+      width: 130,
+      sorter: (a, b) => compareNumber(a.pending_amount, b.pending_amount),
+      render: (value) => `¥${Number(value ?? 0).toLocaleString()}`,
+    },
     {
       title: '状态',
       dataIndex: 'payment_status',
       width: 110,
-      render: (value: string) => <Tag color={value === '已付款' ? 'success' : value === '已提交' ? 'processing' : 'default'}>{value}</Tag>,
+      sorter: (a, b) => compareText(a.payment_status, b.payment_status),
+      render: (value: string) => (
+        <Tag color={value === '已付款' ? 'success' : value === '已提报' ? 'processing' : 'default'}>{value}</Tag>
+      ),
     },
     {
       title: '操作',
@@ -132,7 +188,9 @@ const PaymentsPage = () => {
         <Typography.Title level={3} style={{ marginBottom: 4 }}>
           付款管理
         </Typography.Title>
-        <Typography.Text type="secondary">统一查看所有付款记录，新建时支持先选项目再联动筛选合同。</Typography.Text>
+        <Typography.Text type="secondary">
+          统一查看所有付款记录，表格列支持排序，新建时可先选项目再联动筛选合同。
+        </Typography.Text>
       </div>
 
       <div className="page-panel" style={{ padding: 20 }}>
@@ -154,7 +212,7 @@ const PaymentsPage = () => {
           </Space>
         </div>
 
-        <Table rowKey="id" dataSource={payments} columns={columns} loading={loading} />
+        <Table rowKey="id" dataSource={payments} columns={columns} loading={loading} scroll={{ x: 1200 }} />
       </div>
 
       <Modal

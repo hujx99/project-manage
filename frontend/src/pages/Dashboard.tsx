@@ -123,7 +123,7 @@ const Dashboard = () => {
             legend={{ color: { position: 'bottom', itemMarker: 'circle' } }}
             labels={[
               {
-                text: (data) => `${data.status} ${data.count}`,
+                text: (data: { status: string; count: number }) => `${data.status} ${data.count}`,
                 position: 'outside',
                 style: { fontSize: 12 },
               },
