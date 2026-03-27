@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -205,5 +205,14 @@ class ContractResponse(ContractBase):
     changes: list[ContractChangeResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AIScreenshotParseResponse(BaseModel):
+    parsed_data: dict[str, Any]
+    uncertain_fields: list[str] = Field(default_factory=list)
+
+
+class AIScreenshotConfirmRequest(BaseModel):
+    parsed_data: dict[str, Any]
 
 

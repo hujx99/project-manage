@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .database import Base, engine
-from .routers import contracts, payments, projects
+from .routers import contracts, dashboard, payments, projects
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ async def unhandled_exception_handler(_: Request, exc: Exception):
 app.include_router(projects.router)
 app.include_router(contracts.router)
 app.include_router(payments.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/")
