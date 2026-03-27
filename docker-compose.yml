@@ -3,20 +3,22 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: contract-backend
+    container_name: project-manage-backend
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
-      - '8000:8000'
+      - "8000:8000"
     volumes:
-      - ./backend:/app/backend
+      - ./backend/data.db:/app/backend/data.db
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: contract-frontend
+    container_name: project-manage-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - '8081:80'
+      - "80:80"

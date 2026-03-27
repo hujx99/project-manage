@@ -44,10 +44,25 @@ def _check_project_exists(project_id: int, db: Session):
         raise HTTPException(status_code=400, detail="所属项目不存在")
 
 
+def _build_contract_response(entity: models.Contract) -> schemas.ContractResponse:
+    """构造带告警信息的合同响应。"""
+    warnings: list[str] = []
+    item_total = sum(Decimal(str(item.amount or 0)) for item in entity.items)
+    contract_amount = Decimal(str(entity.amount or 0))
+    paid_total = sum(Decimal(str(payment.actual_amount or 0)) for payment in entity.payments)
+
+    if entity.items and abs(item_total - contract_amount) > Decimal("0.01"):
+        warnings.append("合同金额与标的清单合计不一致")
+    if paid_total - contract_amount > Decimal("0.01"):
+        warnings.append("付款总额已超过合同金额")
+
+    return schemas.ContractResponse.model_validate(entity).model_copy(update={"warnings": warnings})
+
+
 @router.get("", response_model=list[schemas.ContractResponse])
 def list_contracts(db: Session = Depends(get_db)):
     """查询合同列表。"""
-    return (
+    data = (
         db.query(models.Contract)
         .options(
             selectinload(models.Contract.items),
@@ -57,12 +72,13 @@ def list_contracts(db: Session = Depends(get_db)):
         .order_by(models.Contract.id.desc())
         .all()
     )
+    return [_build_contract_response(item) for item in data]
 
 
 @router.get("/{contract_id}", response_model=schemas.ContractResponse)
 def get_contract(contract_id: int, db: Session = Depends(get_db)):
     """查询合同详情，返回完整子表。"""
-    return _get_contract_or_404(contract_id, db)
+    return _build_contract_response(_get_contract_or_404(contract_id, db))
 
 
 @router.post("", response_model=schemas.ContractResponse)
@@ -86,7 +102,7 @@ def create_contract(payload: schemas.ContractCreate, db: Session = Depends(get_d
         db.add(models.Payment(contract_id=entity.id, **payment_data))
 
     db.commit()
-    return _get_contract_or_404(entity.id, db)
+    return _build_contract_response(_get_contract_or_404(entity.id, db))
 
 
 @router.put("/{contract_id}", response_model=schemas.ContractResponse)
@@ -104,7 +120,7 @@ def update_contract(contract_id: int, payload: schemas.ContractUpdate, db: Sessi
         setattr(entity, key, value)
 
     db.commit()
-    return _get_contract_or_404(entity.id, db)
+    return _build_contract_response(_get_contract_or_404(entity.id, db))
 
 
 @router.delete("/{contract_id}")

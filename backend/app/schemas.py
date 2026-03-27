@@ -203,6 +203,7 @@ class ContractResponse(ContractBase):
     items: list[ContractItemResponse] = Field(default_factory=list)
     payments: list[PaymentResponse] = Field(default_factory=list)
     changes: list[ContractChangeResponse] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 

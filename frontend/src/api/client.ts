@@ -1,7 +1,12 @@
 import axios from 'axios';
 
+export const API_BASE_URL =
+  window.location.hostname === 'localhost' && window.location.port === '5173'
+    ? 'http://localhost:8000/api'
+    : '/api';
+
 const client = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: API_BASE_URL,
   timeout: 10000,
 });
 

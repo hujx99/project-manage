@@ -2,6 +2,7 @@ import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Tab
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../api/client';
 import { createContract, fetchContracts } from '../services/contracts';
 import { fetchProjects } from '../services/projects';
 import type { Contract, Project } from '../types';
@@ -124,7 +125,7 @@ const ContractsPage = () => {
               onClick={() => {
                 const params = new URLSearchParams({ format: 'xlsx' });
                 if (projectFilter) params.set('project_id', String(projectFilter));
-                window.open(`http://localhost:8000/api/export/contracts?${params.toString()}`, '_blank');
+                window.open(`${API_BASE_URL}/export/contracts?${params.toString()}`, '_blank');
               }}
             >
               导出

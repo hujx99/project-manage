@@ -238,6 +238,9 @@ async def import_excel(
 
     headers = [str(value).strip() if value is not None else "" for value in rows[0]]
     header_index = {header: index for index, header in enumerate(headers)}
+    missing_headers = [title for title, _ in config["headers"] if title not in header_index]
+    if missing_headers:
+        raise HTTPException(status_code=400, detail=f"缺少列：{', '.join(missing_headers)}")
 
     result = {"success": 0, "failed": 0, "skipped": 0, "errors": []}
 

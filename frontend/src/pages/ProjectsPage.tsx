@@ -3,6 +3,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../api/client';
 import { createProject, deleteProject, fetchProjects, updateProject } from '../services/projects';
 import type { Project } from '../types';
 
@@ -181,7 +182,7 @@ const ProjectsPage = () => {
                 const params = new URLSearchParams({ format: 'xlsx' });
                 if (search) params.set('search', search);
                 if (status) params.set('status', status);
-                window.open(`http://localhost:8000/api/export/projects?${params.toString()}`, '_blank');
+                window.open(`${API_BASE_URL}/export/projects?${params.toString()}`, '_blank');
               }}
             >
               导出

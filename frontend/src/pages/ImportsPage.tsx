@@ -3,7 +3,7 @@ import { Alert, Button, Card, Form, Input, InputNumber, Radio, Select, Space, Ta
 import type { UploadFile } from 'antd/es/upload/interface';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import client from '../api/client';
+import client, { API_BASE_URL } from '../api/client';
 
 interface ParsedContract {
   contract_code?: string | null;
@@ -181,7 +181,7 @@ const ImportsPage = () => {
   };
 
   const downloadTemplate = (entity: 'projects' | 'contracts' | 'payments') => {
-    window.open(`http://localhost:8000/api/import/template/${entity}`, '_blank');
+    window.open(`${API_BASE_URL}/import/template/${entity}`, '_blank');
   };
 
   const startExcelImport = async () => {

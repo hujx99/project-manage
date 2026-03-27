@@ -16,6 +16,16 @@ from ..database import get_db
 router = APIRouter(prefix="/api/export", tags=["导出"])
 
 
+def _safe_int(value: str | None, field_name: str) -> int | None:
+    """安全转换整数参数。"""
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"{field_name} 参数格式不正确") from exc
+
+
 @router.get("/{entity}")
 def export_entity(
     entity: str,
@@ -58,11 +68,11 @@ def export_entity(
             )
 
     elif entity == "contracts":
-        project_id = request.query_params.get("project_id")
+        project_id = _safe_int(request.query_params.get("project_id"), "project_id")
         status = request.query_params.get("status")
         query = db.query(models.Contract).join(models.Project, models.Contract.project_id == models.Project.id)
         if project_id:
-            query = query.filter(models.Contract.project_id == int(project_id))
+            query = query.filter(models.Contract.project_id == project_id)
         if status:
             query = query.filter(models.Contract.status == status)
         data = query.order_by(models.Contract.id.desc()).all()
@@ -82,11 +92,11 @@ def export_entity(
             )
 
     elif entity == "payments":
-        contract_id = request.query_params.get("contract_id")
+        contract_id = _safe_int(request.query_params.get("contract_id"), "contract_id")
         payment_status = request.query_params.get("payment_status")
         query = db.query(models.Payment).join(models.Contract, models.Payment.contract_id == models.Contract.id)
         if contract_id:
-            query = query.filter(models.Payment.contract_id == int(contract_id))
+            query = query.filter(models.Payment.contract_id == contract_id)
         if payment_status:
             query = query.filter(models.Payment.payment_status == payment_status)
         data = query.order_by(models.Payment.id.desc()).all()

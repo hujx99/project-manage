@@ -1,6 +1,7 @@
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
+import { API_BASE_URL } from '../api/client';
 import { createPayment, deletePayment, fetchPayments } from '../services/payments';
 import { fetchContracts } from '../services/contracts';
 import { fetchProjects } from '../services/projects';
@@ -138,7 +139,7 @@ const PaymentsPage = () => {
         <div className="action-bar">
           <div className="action-left" />
           <Space>
-            <Button onClick={() => window.open('http://localhost:8000/api/export/payments?format=xlsx', '_blank')}>
+            <Button onClick={() => window.open(`${API_BASE_URL}/export/payments?format=xlsx`, '_blank')}>
               导出
             </Button>
             <Button

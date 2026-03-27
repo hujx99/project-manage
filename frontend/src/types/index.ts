@@ -125,6 +125,7 @@ export interface Contract {
   items: ContractItem[];
   payments: Payment[];
   changes: ContractChange[];
+  warnings?: string[];
 }
 
 export interface ContractCreate {

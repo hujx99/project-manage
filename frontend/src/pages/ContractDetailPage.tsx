@@ -552,6 +552,10 @@ const ContractDetailPage = () => {
         />
       )}
 
+      {!!contract.warnings?.length && contract.warnings.map((warning) => (
+        <Alert key={warning} type="warning" showIcon message={warning} />
+      ))}
+
       <Card className="page-panel" title="付款进度">
         <Space direction="vertical" style={{ width: '100%' }}>
           <Progress percent={progressPercent} strokeColor="#0f766e" />
