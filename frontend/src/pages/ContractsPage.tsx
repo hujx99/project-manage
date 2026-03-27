@@ -1,63 +1,73 @@
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from 'antd';
+import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Contract, Project } from '../types';
-import { fetchContracts, createContract } from '../services/contracts';
+import { createContract, fetchContracts } from '../services/contracts';
 import { fetchProjects } from '../services/projects';
-
+import type { Contract, Project } from '../types';
 
 const CONTRACT_STATUSES = ['草拟', '签订', '服务中', '执行中', '归档'];
+
+const statusColorMap: Record<string, string> = {
+  草拟: 'default',
+  签订: 'processing',
+  服务中: 'cyan',
+  执行中: 'warning',
+  归档: 'success',
+};
 
 const ContractsPage = () => {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [projectFilter, setProjectFilter] = useState<number | undefined>();
-  const [open, setOpen] = useState(false);
+  const [projectFilter, setProjectFilter] = useState<number>();
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
 
-  const loadData = useCallback(async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const [contractRes, projectRes] = await Promise.all([fetchContracts(), fetchProjects({ page_size: 100 })]);
-      setContracts(contractRes);
-      setProjects(projectRes.items);
-    } catch (e: unknown) {
-      message.error((e as Error).message);
+      const [contractList, projectResult] = await Promise.all([fetchContracts(), fetchProjects({ page: 1, page_size: 1000 })]);
+      setContracts(contractList);
+      setProjects(projectResult.items);
+    } catch (error) {
+      message.error((error as Error).message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     void loadData();
-  }, [loadData]);
+  }, []);
 
-  const filteredData = projectFilter
-    ? contracts.filter((c) => c.project_id === projectFilter)
-    : contracts;
+  const projectNameMap = useMemo(() => new Map(projects.map((item) => [item.id, item.project_name])), [projects]);
 
-  const projectNameMap = new Map(projects.map((p) => [p.id, p.project_name]));
+  const dataSource = useMemo(
+    () => (projectFilter ? contracts.filter((item) => item.project_id === projectFilter) : contracts),
+    [contracts, projectFilter],
+  );
 
   const handleCreate = async () => {
     const values = await form.validateFields();
-    const payload = {
-      ...values,
-      sign_date: values.sign_date ? values.sign_date.format('YYYY-MM-DD') : undefined,
-      start_date: values.start_date ? values.start_date.format('YYYY-MM-DD') : undefined,
-      end_date: values.end_date ? values.end_date.format('YYYY-MM-DD') : undefined,
-    };
     setSubmitting(true);
     try {
-      await createContract(payload);
-      message.success('创建成功');
-      setOpen(false);
+      await createContract({
+        ...values,
+        sign_date: values.sign_date ? values.sign_date.format('YYYY-MM-DD') : undefined,
+        filing_date: values.filing_date ? values.filing_date.format('YYYY-MM-DD') : undefined,
+        start_date: values.start_date ? values.start_date.format('YYYY-MM-DD') : undefined,
+        end_date: values.end_date ? values.end_date.format('YYYY-MM-DD') : undefined,
+        items: [],
+        payments: [],
+      });
+      message.success('合同已创建');
+      setModalOpen(false);
       form.resetFields();
       void loadData();
-    } catch (e: unknown) {
-      message.error((e as Error).message);
+    } catch (error) {
+      message.error((error as Error).message);
     } finally {
       setSubmitting(false);
     }
@@ -72,79 +82,72 @@ const ContractsPage = () => {
     },
     { title: '合同名称', dataIndex: 'contract_name' },
     {
-      title: '所属项目',
+      title: '所属项目名称',
       dataIndex: 'project_id',
-      width: 200,
-      render: (v: number) => projectNameMap.get(v) || '-',
+      width: 220,
+      render: (value: number) => projectNameMap.get(value) || '-',
     },
-    { title: '供应商', dataIndex: 'vendor', width: 200 },
-    {
-      title: '金额',
-      dataIndex: 'amount',
-      width: 140,
-      render: (v: number) => `¥${Number(v).toLocaleString()}`,
-    },
+    { title: '供应商', dataIndex: 'vendor', width: 220, render: (value) => value || '-' },
+    { title: '金额', dataIndex: 'amount', width: 140, render: (value) => `¥${Number(value).toLocaleString()}` },
     {
       title: '状态',
       dataIndex: 'status',
-      width: 100,
-      render: (v: string) => <Tag>{v}</Tag>,
+      width: 120,
+      render: (value: string) => <Tag color={statusColorMap[value] ?? 'default'}>{value}</Tag>,
     },
   ];
 
   return (
-    <>
-      <div className="action-bar">
-        <Space className="action-left">
-          <Select
-            placeholder="按项目筛选"
-            allowClear
-            style={{ width: 260 }}
-            showSearch
-            optionFilterProp="label"
-            options={projects.map((p) => ({ label: p.project_name, value: p.id }))}
-            onChange={(value) => setProjectFilter(value)}
-          />
-        </Space>
-        <Space>
-          <Button
-            onClick={() => {
-              const params = new URLSearchParams({ format: 'xlsx' });
-              if (projectFilter) params.set('project_id', String(projectFilter));
-              window.open(`/api/export/contracts?${params.toString()}`, '_blank');
-            }}
-          >
-            导出
-          </Button>
+    <div className="detail-stack">
+      <div>
+        <Typography.Title level={3} style={{ marginBottom: 4 }}>
+          合同管理
+        </Typography.Title>
+        <Typography.Text type="secondary">按项目筛选合同，点击合同可进入详情页维护标的、付款和变更记录。</Typography.Text>
+      </div>
+
+      <div className="page-panel" style={{ padding: 20 }}>
+        <div className="action-bar">
+          <div className="action-left">
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="按项目筛选"
+              style={{ width: 280 }}
+              options={projects.map((item) => ({ label: item.project_name, value: item.id }))}
+              onChange={(value) => setProjectFilter(value)}
+            />
+          </div>
           <Button
             type="primary"
             onClick={() => {
               form.resetFields();
-              setOpen(true);
+              setModalOpen(true);
             }}
           >
             新建合同
           </Button>
-        </Space>
+        </div>
+
+        <Table rowKey="id" dataSource={dataSource} columns={columns} loading={loading} />
       </div>
-      <Table rowKey="id" dataSource={filteredData} columns={columns} loading={loading} />
 
       <Modal
         title="新建合同"
-        open={open}
-        onCancel={() => setOpen(false)}
-        onOk={handleCreate}
+        open={modalOpen}
+        onCancel={() => setModalOpen(false)}
+        onOk={() => void handleCreate()}
         confirmLoading={submitting}
+        width={720}
         destroyOnClose
-        width={640}
       >
         <Form layout="vertical" form={form}>
           <Form.Item label="所属项目" name="project_id" rules={[{ required: true, message: '请选择所属项目' }]}>
             <Select
               showSearch
               optionFilterProp="label"
-              options={projects.map((p) => ({ label: p.project_name, value: p.id }))}
-              placeholder="请选择项目"
+              options={projects.map((item) => ({ label: item.project_name, value: item.id }))}
             />
           </Form.Item>
           <Form.Item label="合同编号" name="contract_code" rules={[{ required: true, message: '请输入合同编号' }]}>
@@ -157,10 +160,16 @@ const ContractsPage = () => {
             <Input />
           </Form.Item>
           <Form.Item label="合同金额" name="amount" rules={[{ required: true, message: '请输入合同金额' }]}>
-            <InputNumber style={{ width: '100%' }} min={0} precision={2} />
+            <InputNumber min={0} precision={2} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}>
-            <Select options={CONTRACT_STATUSES.map((s) => ({ label: s, value: s }))} />
+          <Form.Item label="合同状态" name="status" rules={[{ required: true, message: '请选择合同状态' }]}>
+            <Select options={CONTRACT_STATUSES.map((item) => ({ label: item, value: item }))} />
+          </Form.Item>
+          <Form.Item label="采购类型" name="procurement_type">
+            <Input />
+          </Form.Item>
+          <Form.Item label="费用归属责任中心" name="cost_department">
+            <Input />
           </Form.Item>
           <Form.Item label="收支方向" name="payment_direction">
             <Select
@@ -174,18 +183,24 @@ const ContractsPage = () => {
           <Form.Item label="签订日期" name="sign_date">
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
+          <Form.Item label="备案日期" name="filing_date">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
           <Form.Item label="开始执行日期" name="start_date">
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label="结束执行日期" name="end_date">
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
+          <Form.Item label="备案文件" name="filing_reference">
+            <Input />
+          </Form.Item>
           <Form.Item label="备注" name="remark">
-            <Input.TextArea rows={2} />
+            <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   );
 };
 

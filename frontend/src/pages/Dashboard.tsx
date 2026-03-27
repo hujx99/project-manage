@@ -1,405 +1,198 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Card, Col, Empty, List, Progress, Row, Statistic, Table, Tag, Typography } from 'antd';
+import { Card, Empty, Progress, Skeleton, Space, Statistic, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import {
-  ProjectOutlined,
-  FileTextOutlined,
-  DollarOutlined,
-  ClockCircleOutlined,
-  RightOutlined,
-} from '@ant-design/icons';
-import { Pie } from '@ant-design/charts';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import type { Contract, Payment, Project } from '../types';
+import { fetchContracts } from '../services/contracts';
+import { fetchPayments } from '../services/payments';
+import { fetchProjects } from '../services/projects';
 
-import {
-  fetchDashboardSummary,
-  fetchPendingPayments,
-  fetchProjectOverview,
-  type DashboardSummary,
-  type PaymentOverview,
-  type PendingPayment,
-  type ProjectOverview,
-} from '../services/dashboard';
-
-const { Title, Text } = Typography;
-
-function formatMoney(value: number): string {
-  return `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+interface PendingPaymentRow extends Payment {
+  project_name: string;
+  contract_name: string;
 }
 
-const statusColorMap: Record<string, string> = {
-  '执行中': 'blue',
-  '已完成': 'green',
-  '已终止': 'red',
-  '草稿': 'default',
-  '审批中': 'orange',
-};
-
-const paymentStatusColorMap: Record<string, string> = {
-  '已付款': 'green',
-  '未付款': 'default',
-  '已提交': 'orange',
-  '审批中': 'blue',
-  '已拒绝': 'red',
-};
-
-const columnStyle: React.CSSProperties = {
-  height: 420,
-  overflowY: 'auto',
-  borderRight: '1px solid #f0f0f0',
-};
-
-const listItemStyle = (selected: boolean): React.CSSProperties => ({
-  padding: '10px 12px',
-  cursor: 'pointer',
-  backgroundColor: selected ? '#e6f4ff' : undefined,
-  borderLeft: selected ? '3px solid #1890ff' : '3px solid transparent',
-  transition: 'all 0.2s',
-});
-
-export default function Dashboard() {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
-  const [projectOverview, setProjectOverview] = useState<ProjectOverview[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [selectedContractId, setSelectedContractId] = useState<number | null>(null);
-  const navigate = useNavigate();
+const Dashboard = () => {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [payments, setPayments] = useState<PendingPaymentRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadDashboardData = async () => {
+    const loadData = async () => {
       setLoading(true);
       try {
-        const [summaryRes, pendingRes, overviewRes] = await Promise.all([
-          fetchDashboardSummary(),
-          fetchPendingPayments(),
-          fetchProjectOverview(),
+        const [projectRes, contractRes, paymentRes] = await Promise.all([
+          fetchProjects({ page: 1, page_size: 1000 }),
+          fetchContracts(),
+          fetchPayments(),
         ]);
-        setSummary(summaryRes);
-        setPendingPayments(pendingRes);
-        setProjectOverview(overviewRes);
-        // Auto-select first project
-        if (overviewRes.length > 0) {
-          setSelectedProjectId(overviewRes[0].id);
-          if (overviewRes[0].contracts.length > 0) {
-            setSelectedContractId(overviewRes[0].contracts[0].id);
-          }
-        }
+
+        const projectNameMap = new Map(projectRes.items.map((item) => [item.id, item.project_name]));
+        const contractMap = new Map(contractRes.map((item) => [item.id, item]));
+
+        const enrichedPayments = paymentRes.map((item) => {
+          const contract = contractMap.get(item.contract_id);
+          return {
+            ...item,
+            contract_name: contract?.contract_name ?? '-',
+            project_name: contract ? (projectNameMap.get(contract.project_id) ?? '-') : '-',
+          };
+        });
+
+        setProjects(projectRes.items);
+        setContracts(contractRes);
+        setPayments(enrichedPayments);
+      } catch (error) {
+        message.error((error as Error).message);
       } finally {
         setLoading(false);
       }
     };
 
-    void loadDashboardData();
+    void loadData();
   }, []);
 
-  const selectedProject = useMemo(
-    () => projectOverview.find((p) => p.id === selectedProjectId) ?? null,
-    [projectOverview, selectedProjectId],
+  const totals = useMemo(() => {
+    const totalBudget = projects.reduce((sum, item) => sum + Number(item.budget ?? 0), 0);
+    const totalContractAmount = contracts.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
+    const totalPaid = payments.reduce((sum, item) => sum + Number(item.actual_amount ?? 0), 0);
+    const totalPending = payments.reduce((sum, item) => sum + Number(item.pending_amount ?? 0), 0);
+    return { totalBudget, totalContractAmount, totalPaid, totalPending };
+  }, [contracts, payments, projects]);
+
+  const projectStatusSummary = useMemo(() => {
+    const counter = new Map<string, number>();
+    projects.forEach((item) => {
+      counter.set(item.status, (counter.get(item.status) ?? 0) + 1);
+    });
+    return Array.from(counter.entries()).map(([status, count]) => ({ status, count }));
+  }, [projects]);
+
+  const pendingRows = useMemo(
+    () =>
+      payments
+        .filter((item) => Number(item.pending_amount ?? 0) > 0)
+        .sort((a, b) => (a.planned_date ?? '').localeCompare(b.planned_date ?? ''))
+        .slice(0, 10),
+    [payments],
   );
 
-  const selectedContract = useMemo(
-    () => selectedProject?.contracts.find((c) => c.id === selectedContractId) ?? null,
-    [selectedProject, selectedContractId],
-  );
-
-  const handleSelectProject = (projectId: number) => {
-    setSelectedProjectId(projectId);
-    const project = projectOverview.find((p) => p.id === projectId);
-    if (project && project.contracts.length > 0) {
-      setSelectedContractId(project.contracts[0].id);
-    } else {
-      setSelectedContractId(null);
-    }
-  };
-
-  const pendingColumns: ColumnsType<PendingPayment> = useMemo(
-    () => [
-      {
-        title: '项目名称',
-        dataIndex: 'project_name',
-        key: 'project_name',
-      },
-      {
-        title: '合同名称',
-        dataIndex: 'contract_name',
-        key: 'contract_name',
-      },
-      {
-        title: '金额',
-        dataIndex: 'amount',
-        key: 'amount',
-        render: (value: number) => formatMoney(value),
-      },
-      {
-        title: '计划日期',
-        dataIndex: 'planned_date',
-        key: 'planned_date',
-        sorter: (a, b) => new Date(a.planned_date).getTime() - new Date(b.planned_date).getTime(),
-        defaultSortOrder: 'ascend',
-        render: (value: string) => {
-          const remainingDays = Math.ceil((new Date(value).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-          const isUrgent = remainingDays <= 7;
-          return <span style={{ color: isUrgent ? '#ff4d4f' : undefined }}>{value}</span>;
-        },
-      },
-    ],
-    [],
-  );
-
-  // --- Miller Columns rendering ---
-
-  const renderProjectColumn = () => (
-    <div style={columnStyle}>
-      <div style={{ padding: '8px 12px', background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
-        <Text strong>项目列表</Text>
-        <Text type="secondary" style={{ float: 'right' }}>{projectOverview.length} 个</Text>
-      </div>
-      {projectOverview.length === 0 ? (
-        <Empty description="暂无项目" style={{ marginTop: 60 }} />
-      ) : (
-        <List
-          dataSource={projectOverview}
-          renderItem={(project) => (
-            <div
-              style={listItemStyle(project.id === selectedProjectId)}
-              onClick={() => handleSelectProject(project.id)}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong ellipsis style={{ maxWidth: '70%' }}>{project.project_name}</Text>
-                <RightOutlined style={{ color: '#bfbfbf', fontSize: 10 }} />
-              </div>
-              <div style={{ marginTop: 4 }}>
-                <Tag color={statusColorMap[project.status] || 'default'} style={{ marginRight: 4 }}>{project.status}</Tag>
-                <Text type="secondary" style={{ fontSize: 12 }}>合同 {project.contract_count} 个</Text>
-              </div>
-              <div style={{ marginTop: 4, fontSize: 12 }}>
-                <span>预算: {formatMoney(project.budget)}</span>
-                {project.total_pending_amount > 0 && (
-                  <span style={{ color: '#cf1322', marginLeft: 8 }}>
-                    待付: {formatMoney(project.total_pending_amount)}
-                  </span>
-                )}
-              </div>
-              <a
-                onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}`); }}
-                style={{ fontSize: 12 }}
-              >
-                查看详情
-              </a>
-            </div>
-          )}
-        />
-      )}
-    </div>
-  );
-
-  const renderContractColumn = () => {
-    const contracts = selectedProject?.contracts ?? [];
-    return (
-      <div style={columnStyle}>
-        <div style={{ padding: '8px 12px', background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
-          <Text strong>合同列表</Text>
-          <Text type="secondary" style={{ float: 'right' }}>{contracts.length} 个</Text>
-        </div>
-        {selectedProject && contracts.length > 0 && (
-          <div style={{ padding: '6px 12px', background: '#f6ffed', borderBottom: '1px solid #f0f0f0', fontSize: 12 }}>
-            <span>合同总额: {formatMoney(selectedProject.total_contract_amount)}</span>
-            <span style={{ marginLeft: 8 }}>待付: <span style={{ color: '#cf1322' }}>{formatMoney(selectedProject.total_pending_amount)}</span></span>
-          </div>
-        )}
-        {!selectedProject ? (
-          <Empty description="请选择项目" style={{ marginTop: 60 }} />
-        ) : contracts.length === 0 ? (
-          <Empty description="暂无合同" style={{ marginTop: 60 }} />
-        ) : (
-          <List
-            dataSource={contracts}
-            renderItem={(contract) => {
-              const total = Number(contract.paid_amount) + Number(contract.pending_amount);
-              const percent = total > 0 ? Math.round((Number(contract.paid_amount) / total) * 100) : 0;
-              return (
-                <div
-                  style={listItemStyle(contract.id === selectedContractId)}
-                  onClick={() => setSelectedContractId(contract.id)}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text strong ellipsis style={{ maxWidth: '70%' }}>{contract.contract_name}</Text>
-                    <RightOutlined style={{ color: '#bfbfbf', fontSize: 10 }} />
-                  </div>
-                  <div style={{ marginTop: 4, fontSize: 12 }}>
-                    <Tag color={statusColorMap[contract.status] || 'default'} style={{ marginRight: 4 }}>{contract.status}</Tag>
-                    <Text type="secondary">{contract.vendor}</Text>
-                  </div>
-                  <div style={{ marginTop: 4, fontSize: 12 }}>
-                    <span>金额: {formatMoney(contract.amount)}</span>
-                    <span style={{ marginLeft: 8 }}>已付: {formatMoney(contract.paid_amount)}</span>
-                  </div>
-                  <Progress percent={percent} size="small" style={{ marginTop: 4, marginBottom: 0 }} />
-                  <a
-                    onClick={(e) => { e.stopPropagation(); navigate(`/contracts/${contract.id}`); }}
-                    style={{ fontSize: 12 }}
-                  >
-                    查看详情
-                  </a>
-                </div>
-              );
-            }}
-          />
-        )}
-      </div>
-    );
-  };
-
-  const renderPaymentColumn = () => {
-    const payments = selectedContract?.payments ?? [];
-    const contractAmount = selectedContract?.amount ?? 0;
-    const paidAmount = selectedContract?.paid_amount ?? 0;
-    const progressPercent = contractAmount > 0 ? Math.round((paidAmount / contractAmount) * 100) : 0;
-
-    return (
-      <div style={{ ...columnStyle, borderRight: 'none' }}>
-        <div style={{ padding: '8px 12px', background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
-          <Text strong>付款明细</Text>
-          <Text type="secondary" style={{ float: 'right' }}>{payments.length} 笔</Text>
-        </div>
-        {selectedContract && payments.length > 0 && (
-          <div style={{ padding: '6px 12px', background: '#fff7e6', borderBottom: '1px solid #f0f0f0', fontSize: 12 }}>
-            <span>合同额: {formatMoney(contractAmount)}</span>
-            <span style={{ marginLeft: 8 }}>已付: {formatMoney(paidAmount)}</span>
-            <span style={{ marginLeft: 8 }}>进度: {progressPercent}%</span>
-          </div>
-        )}
-        {!selectedContract ? (
-          <Empty description="请选择合同" style={{ marginTop: 60 }} />
-        ) : payments.length === 0 ? (
-          <Empty description="暂无付款记录" style={{ marginTop: 60 }} />
-        ) : (
-          <List
-            dataSource={payments}
-            renderItem={(payment: PaymentOverview) => (
-              <div style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text strong>{payment.phase || `第${payment.seq ?? '-'}期`}</Text>
-                  <Tag color={paymentStatusColorMap[payment.payment_status] || 'default'}>
-                    {payment.payment_status}
-                  </Tag>
-                </div>
-                <div style={{ marginTop: 4, fontSize: 12 }}>
-                  <span>计划: {formatMoney(payment.planned_amount)}</span>
-                  <span style={{ marginLeft: 8 }}>实付: {formatMoney(payment.actual_amount)}</span>
-                </div>
-                {payment.pending_amount > 0 && (
-                  <div style={{ fontSize: 12, color: '#cf1322', marginTop: 2 }}>
-                    待付: {formatMoney(payment.pending_amount)}
-                  </div>
-                )}
-                {payment.planned_date && (
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>
-                    计划日期: {payment.planned_date}
-                  </div>
-                )}
-              </div>
-            )}
-          />
-        )}
-      </div>
-    );
-  };
+  const pendingColumns: ColumnsType<PendingPaymentRow> = [
+    { title: '项目名称', dataIndex: 'project_name' },
+    { title: '合同名称', dataIndex: 'contract_name' },
+    { title: '付款阶段', dataIndex: 'phase', render: (value) => value || '-' },
+    { title: '计划日期', dataIndex: 'planned_date', render: (value) => value || '-' },
+    {
+      title: '待付款',
+      dataIndex: 'pending_amount',
+      render: (value) => `¥${Number(value ?? 0).toLocaleString()}`,
+    },
+    {
+      title: '状态',
+      dataIndex: 'payment_status',
+      render: (value: string) => <Tag color={value === '已付款' ? 'success' : value === '已提交' ? 'processing' : 'default'}>{value}</Tag>,
+    },
+  ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <Title level={3}>仪表盘</Title>
+    <div className="detail-stack">
+      <div>
+        <Typography.Title level={3} style={{ marginBottom: 4 }}>
+          仪表盘
+        </Typography.Title>
+        <Typography.Text type="secondary">快速查看项目、合同与付款的整体情况。</Typography.Text>
+      </div>
 
-      {/* 顶部汇总卡片 */}
-      <Row gutter={16}>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="项目总数"
-              value={summary?.project_count ?? 0}
-              loading={loading}
-              prefix={<ProjectOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="合同总数"
-              value={summary?.contract_count ?? 0}
-              loading={loading}
-              prefix={<FileTextOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="总合同额"
-              value={summary?.total_contract_amount ?? 0}
-              formatter={(value) => formatMoney(Number(value))}
-              loading={loading}
-              prefix={<DollarOutlined style={{ color: '#52c41a' }} />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="总待付款"
-              value={summary?.total_pending_amount ?? 0}
-              formatter={(value) => formatMoney(Number(value))}
-              loading={loading}
-              prefix={<ClockCircleOutlined style={{ color: '#cf1322' }} />}
-              valueStyle={{ color: '#cf1322' }}
-            />
-          </Card>
-        </Col>
-      </Row>
+      <div className="summary-grid">
+        <Card className="page-panel summary-card">
+          <Statistic title="项目总数" value={projects.length} loading={loading} />
+        </Card>
+        <Card className="page-panel summary-card">
+          <Statistic title="合同总数" value={contracts.length} loading={loading} />
+        </Card>
+        <Card className="page-panel summary-card">
+          <Statistic title="付款总笔数" value={payments.length} loading={loading} />
+        </Card>
+        <Card className="page-panel summary-card">
+          <Statistic title="付款进度" value={totals.totalContractAmount ? Math.round((totals.totalPaid / totals.totalContractAmount) * 100) : 0} suffix="%" loading={loading} />
+        </Card>
+      </div>
 
-      {/* 中部：饼图 + 三栏级联面板 */}
-      <Row gutter={16} style={{ marginTop: 16 }}>
-        <Col span={6}>
-          <Card title="项目状态分布" loading={loading} style={{ height: '100%' }}>
-            <Pie
-              data={summary?.project_status_distribution ?? []}
-              angleField="count"
-              colorField="status"
-              label={{ text: 'status', position: 'outside' }}
-              legend={{ color: { title: false, position: 'right' } }}
-              height={320}
-            />
-          </Card>
-        </Col>
-        <Col span={18}>
-          <Card
-            title="项目-合同-付款 三级钻取"
-            loading={loading}
-            bodyStyle={{ padding: 0 }}
-          >
-            <Row>
-              <Col span={8}>{renderProjectColumn()}</Col>
-              <Col span={8}>{renderContractColumn()}</Col>
-              <Col span={8}>{renderPaymentColumn()}</Col>
-            </Row>
-          </Card>
-        </Col>
-      </Row>
+      <div className="summary-grid">
+        <Card className="page-panel summary-card">
+          <Statistic title="总预算" value={totals.totalBudget} precision={2} prefix="¥" loading={loading} />
+        </Card>
+        <Card className="page-panel summary-card">
+          <Statistic title="总合同额" value={totals.totalContractAmount} precision={2} prefix="¥" loading={loading} />
+        </Card>
+        <Card className="page-panel summary-card">
+          <Statistic title="总已付" value={totals.totalPaid} precision={2} prefix="¥" loading={loading} />
+        </Card>
+        <Card className="page-panel summary-card">
+          <Statistic title="总待付" value={totals.totalPending} precision={2} prefix="¥" loading={loading} />
+        </Card>
+      </div>
 
-      {/* 底部：30天待付款提醒 */}
-      <Card title="未来 30 天待付款提醒" style={{ marginTop: 16 }}>
+      <div className="summary-grid" style={{ gridTemplateColumns: '1.15fr 1fr' }}>
+        <Card className="page-panel" title="项目状态分布">
+          {loading ? (
+            <Skeleton active paragraph={{ rows: 5 }} />
+          ) : projectStatusSummary.length ? (
+            <Space direction="vertical" style={{ width: '100%' }} size={14}>
+              {projectStatusSummary.map((item) => (
+                <div key={item.status}>
+                  <Space style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography.Text>{item.status}</Typography.Text>
+                    <Typography.Text type="secondary">{item.count} 个</Typography.Text>
+                  </Space>
+                  <Progress percent={Math.round((item.count / projects.length) * 100)} showInfo={false} strokeColor="#0f766e" />
+                </div>
+              ))}
+            </Space>
+          ) : (
+            <Empty description="暂无项目数据" />
+          )}
+        </Card>
+
+        <Card className="page-panel" title="金额概览">
+          {loading ? (
+            <Skeleton active paragraph={{ rows: 5 }} />
+          ) : (
+            <Space direction="vertical" style={{ width: '100%' }} size={18}>
+              <div>
+                <Typography.Text>合同金额执行率</Typography.Text>
+                <Progress
+                  percent={totals.totalContractAmount ? Math.round((totals.totalPaid / totals.totalContractAmount) * 100) : 0}
+                  strokeColor="#ea580c"
+                />
+              </div>
+              <div>
+                <Typography.Text>预算覆盖合同额</Typography.Text>
+                <Progress
+                  percent={totals.totalBudget ? Math.min(100, Math.round((totals.totalContractAmount / totals.totalBudget) * 100)) : 0}
+                  strokeColor="#2563eb"
+                />
+              </div>
+              <Typography.Text className="muted-text">
+                待付款金额会随着付款记录的计划金额和实际金额自动变化。
+              </Typography.Text>
+            </Space>
+          )}
+        </Card>
+      </div>
+
+      <Card className="page-panel" title="待付款提醒">
         <Table
-          rowKey={(row) => `${row.project_name}-${row.contract_name}-${row.planned_date}`}
+          rowKey="id"
+          dataSource={pendingRows}
           columns={pendingColumns}
-          dataSource={pendingPayments}
           loading={loading}
-          pagination={{ pageSize: 10 }}
+          pagination={false}
+          locale={{ emptyText: '暂无待付款记录' }}
         />
       </Card>
     </div>
   );
-}
+};
+
+export default Dashboard;

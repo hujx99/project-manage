@@ -1,14 +1,15 @@
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, message } from 'antd';
+import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import type { Project } from '../types';
-import { fetchProjects, createProject, updateProject, deleteProject } from '../services/projects';
 import dayjs from 'dayjs';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { createProject, deleteProject, fetchProjects, updateProject } from '../services/projects';
+import type { Project } from '../types';
 
+const PROJECT_TYPES = ['研发项目', '工程项目', '服务项目'];
 const PROJECT_STATUSES = ['立项', '执行中', '验收', '结项'];
 
-const statusColor: Record<string, string> = {
+const statusColorMap: Record<string, string> = {
   立项: 'default',
   执行中: 'processing',
   验收: 'warning',
@@ -16,74 +17,90 @@ const statusColor: Record<string, string> = {
 };
 
 const ProjectsPage = () => {
-  const [data, setData] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [loading, setLoading] = useState(false);
-  const [keyword, setKeyword] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string | undefined>();
-  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState<string>();
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
 
-  const loadData = useCallback(async () => {
+  const loadProjects = async (nextPage = page, nextPageSize = pageSize, nextStatus = status, nextSearch = search) => {
     setLoading(true);
     try {
-      const res = await fetchProjects({
-        page,
-        page_size: pageSize,
-        search: keyword || undefined,
-        status: statusFilter,
+      const result = await fetchProjects({
+        page: nextPage,
+        page_size: nextPageSize,
+        status: nextStatus,
+        search: nextSearch || undefined,
       });
-      setData(res.items);
-      setTotal(res.total);
-    } catch (e: unknown) {
-      message.error((e as Error).message);
+      setProjects(result.items);
+      setTotal(result.total);
+    } catch (error) {
+      message.error((error as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, keyword, statusFilter]);
+  };
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void loadProjects();
+  }, []);
+
+  const openCreateModal = () => {
+    setEditing(null);
+    form.resetFields();
+    setModalOpen(true);
+  };
+
+  const openEditModal = (record: Project) => {
+    setEditing(record);
+    form.setFieldsValue({
+      ...record,
+      start_date: record.start_date ? dayjs(record.start_date) : undefined,
+    });
+    setModalOpen(true);
+  };
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
     const payload = {
       ...values,
       start_date: values.start_date ? values.start_date.format('YYYY-MM-DD') : undefined,
-      budget: values.budget ?? undefined,
     };
+
     setSubmitting(true);
     try {
       if (editing) {
         await updateProject(editing.id, payload);
-        message.success('更新成功');
+        message.success('项目已更新');
       } else {
         await createProject(payload);
-        message.success('创建成功');
+        message.success('项目已创建');
       }
-      setOpen(false);
-      form.resetFields();
+      setModalOpen(false);
       setEditing(null);
-      void loadData();
-    } catch (e: unknown) {
-      message.error((e as Error).message);
+      form.resetFields();
+      void loadProjects(1, pageSize, status, search);
+      setPage(1);
+    } catch (error) {
+      message.error((error as Error).message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (record: Project) => {
     try {
-      await deleteProject(id);
-      message.success('删除成功');
-      void loadData();
-    } catch (e: unknown) {
-      message.error((e as Error).message);
+      await deleteProject(record.id);
+      message.success('项目已删除');
+      void loadProjects();
+    } catch (error) {
+      message.error((error as Error).message);
     }
   };
 
@@ -94,40 +111,29 @@ const ProjectsPage = () => {
       dataIndex: 'project_name',
       render: (_, record) => <Link to={`/projects/${record.id}`}>{record.project_name}</Link>,
     },
-    { title: '属性', dataIndex: 'project_type', width: 120 },
+    { title: '属性', dataIndex: 'project_type', render: (value) => value || '-' },
     {
       title: '状态',
       dataIndex: 'status',
-      width: 100,
-      render: (value: string) => <Tag color={statusColor[value] ?? 'default'}>{value}</Tag>,
+      width: 110,
+      render: (value: string) => <Tag color={statusColorMap[value] ?? 'default'}>{value}</Tag>,
     },
     {
-      title: '预算金额',
+      title: '金额',
       dataIndex: 'budget',
       width: 140,
-      render: (value: number | null) => (value != null ? `¥${Number(value).toLocaleString()}` : '-'),
+      render: (value) => (value != null ? `¥${Number(value).toLocaleString()}` : '-'),
     },
-    { title: '负责人', dataIndex: 'manager', width: 100 },
+    { title: '负责人', dataIndex: 'manager', width: 120, render: (value) => value || '-' },
     {
       title: '操作',
-      width: 140,
+      width: 150,
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            size="small"
-            onClick={() => {
-              setEditing(record);
-              form.setFieldsValue({
-                ...record,
-                start_date: record.start_date ? dayjs(record.start_date) : undefined,
-              });
-              setOpen(true);
-            }}
-          >
+          <Button type="link" onClick={() => openEditModal(record)}>
             编辑
           </Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record.id)}>
+          <Button type="link" danger onClick={() => void handleDelete(record)}>
             删除
           </Button>
         </Space>
@@ -136,78 +142,72 @@ const ProjectsPage = () => {
   ];
 
   return (
-    <>
-      <div className="action-bar">
-        <Space className="action-left">
-          <Input.Search
-            placeholder="搜索项目编号/项目名称"
-            onSearch={(v) => {
-              setKeyword(v);
-              setPage(1);
-            }}
-            allowClear
-            style={{ width: 240 }}
-          />
-          <Select
-            placeholder="按状态筛选"
-            allowClear
-            style={{ width: 160 }}
-            options={PROJECT_STATUSES.map((s) => ({ label: s, value: s }))}
-            onChange={(value) => {
-              setStatusFilter(value);
-              setPage(1);
-            }}
-          />
-        </Space>
-        <Space>
-          <Button
-            onClick={() => {
-              const params = new URLSearchParams({ format: 'xlsx' });
-              if (keyword) params.set('search', keyword);
-              if (statusFilter) params.set('status', statusFilter);
-              window.open(`/api/export/projects?${params.toString()}`, '_blank');
-            }}
-          >
-            导出
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => {
-              setEditing(null);
-              form.resetFields();
-              setOpen(true);
-            }}
-          >
+    <div className="detail-stack">
+      <div>
+        <Typography.Title level={3} style={{ marginBottom: 4 }}>
+          项目管理
+        </Typography.Title>
+        <Typography.Text type="secondary">按状态和关键字筛选项目，支持弹窗方式新建和编辑。</Typography.Text>
+      </div>
+
+      <div className="page-panel" style={{ padding: 20 }}>
+        <div className="action-bar">
+          <div className="action-left">
+            <Input.Search
+              placeholder="搜索项目编号或项目名称"
+              allowClear
+              style={{ width: 260 }}
+              onSearch={(value) => {
+                setSearch(value);
+                setPage(1);
+                void loadProjects(1, pageSize, status, value);
+              }}
+            />
+            <Select
+              placeholder="按状态筛选"
+              allowClear
+              style={{ width: 180 }}
+              options={PROJECT_STATUSES.map((item) => ({ label: item, value: item }))}
+              onChange={(value) => {
+                setStatus(value);
+                setPage(1);
+                void loadProjects(1, pageSize, value, search);
+              }}
+            />
+          </div>
+          <Button type="primary" onClick={openCreateModal}>
             新建项目
           </Button>
-        </Space>
+        </div>
+
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={projects}
+          loading={loading}
+          pagination={{
+            current: page,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            showTotal: (value) => `共 ${value} 条`,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPage);
+              setPageSize(nextPageSize);
+              void loadProjects(nextPage, nextPageSize, status, search);
+            },
+          }}
+        />
       </div>
-      <Table
-        rowKey="id"
-        dataSource={data}
-        columns={columns}
-        loading={loading}
-        pagination={{
-          current: page,
-          pageSize,
-          total,
-          showSizeChanger: true,
-          showTotal: (t) => `共 ${t} 条`,
-          onChange: (p, ps) => {
-            setPage(p);
-            setPageSize(ps);
-          },
-        }}
-      />
 
       <Modal
         title={editing ? '编辑项目' : '新建项目'}
-        open={open}
+        open={modalOpen}
         onCancel={() => {
-          setOpen(false);
+          setModalOpen(false);
           setEditing(null);
         }}
-        onOk={handleSubmit}
+        onOk={() => void handleSubmit()}
         confirmLoading={submitting}
         destroyOnClose
       >
@@ -219,33 +219,26 @@ const ProjectsPage = () => {
             <Input />
           </Form.Item>
           <Form.Item label="项目属性" name="project_type">
-            <Select
-              allowClear
-              options={[
-                { label: '研发项目', value: '研发项目' },
-                { label: '工程项目', value: '工程项目' },
-                { label: '服务项目', value: '服务项目' },
-              ]}
-            />
+            <Select allowClear options={PROJECT_TYPES.map((item) => ({ label: item, value: item }))} />
           </Form.Item>
           <Form.Item label="立项日期" name="start_date">
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}>
-            <Select options={PROJECT_STATUSES.map((s) => ({ label: s, value: s }))} />
+          <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择项目状态' }]}>
+            <Select options={PROJECT_STATUSES.map((item) => ({ label: item, value: item }))} />
           </Form.Item>
-          <Form.Item label="预算金额" name="budget">
-            <InputNumber style={{ width: '100%' }} min={0} precision={2} />
+          <Form.Item label="金额" name="budget">
+            <InputNumber min={0} precision={2} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label="负责人" name="manager">
             <Input />
           </Form.Item>
           <Form.Item label="备注" name="remark">
-            <Input.TextArea rows={2} />
+            <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>
-    </>
+    </div>
   );
 };
 
