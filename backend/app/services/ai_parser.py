@@ -110,7 +110,9 @@ def parse_screenshots(images_b64: list[str]) -> tuple[dict[str, Any], list[str]]
         ],
     )
 
-    raw_text = "\n".join(block.text for block in response.content if getattr(block, "text", None))
+    raw_text = "\n".join(block.text for block in response.content if getattr(block, "text", None)).strip()
+    if raw_text.startswith("```"):
+        raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     try:
         parsed = json.loads(raw_text)
     except json.JSONDecodeError as exc:

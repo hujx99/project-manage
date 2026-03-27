@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .database import Base, engine
-from .routers import contracts, dashboard, payments, projects
+from .routers import contracts, dashboard, imports, payments, projects
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,7 @@ app.include_router(projects.router)
 app.include_router(contracts.router)
 app.include_router(payments.router)
 app.include_router(dashboard.router)
+app.include_router(imports.router)
 
 
 @app.get("/")
