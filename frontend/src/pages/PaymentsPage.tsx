@@ -3,12 +3,13 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../api/client';
-import { createPayment, deletePayment, fetchPayments } from '../services/payments';
+import { createPayment, deletePayment, fetchPayments, updatePayment } from '../services/payments';
 import { fetchContracts } from '../services/contracts';
 import { fetchProjects } from '../services/projects';
 import type { Contract, Payment, Project } from '../types';
 
 interface PaymentRow extends Payment {
+  project_code: string;
   project_name: string;
   contract_name: string;
 }
@@ -46,7 +47,7 @@ const PaymentsPage = () => {
         fetchContracts(),
       ]);
 
-      const projectNameMap = new Map(projectResult.items.map((item) => [item.id, item.project_name]));
+      const projectMap = new Map(projectResult.items.map((item) => [item.id, item]));
       const contractMap = new Map(contractList.map((item) => [item.id, item]));
 
       setProjects(projectResult.items);
@@ -54,9 +55,11 @@ const PaymentsPage = () => {
       setPayments(
         paymentList.map((item) => {
           const contract = contractMap.get(item.contract_id);
+          const project = contract ? projectMap.get(contract.project_id) : undefined;
           return {
             ...item,
-            project_name: contract ? (projectNameMap.get(contract.project_id) ?? '-') : '-',
+            project_code: project?.project_code ?? '-',
+            project_name: project?.project_name ?? '-',
             contract_name: contract?.contract_name ?? '-',
           };
         }),
@@ -114,56 +117,78 @@ const PaymentsPage = () => {
     }
   };
 
+  const handleMarkPaid = async (record: PaymentRow) => {
+    try {
+      await updatePayment(record.id, {
+        payment_status: '已付款',
+        actual_amount: record.actual_amount != null ? Number(record.actual_amount) : Number(record.planned_amount ?? 0),
+        actual_date: record.actual_date || new Date().toISOString().slice(0, 10),
+      });
+      message.success('已标记为已付款');
+      void loadData();
+    } catch (error) {
+      message.error((error as Error).message);
+    }
+  };
+
   const columns: ColumnsType<PaymentRow> = [
+    {
+      title: '项目编号',
+      dataIndex: 'project_code',
+      width: 160,
+      sorter: (a, b) => compareText(a.project_code, b.project_code),
+    },
     {
       title: '项目名称',
       dataIndex: 'project_name',
-      width: 220,
+      width: 200,
+      ellipsis: true,
       sorter: (a, b) => compareText(a.project_name, b.project_name),
     },
     {
       title: '合同名称',
       dataIndex: 'contract_name',
-      width: 220,
+      width: 200,
+      ellipsis: true,
       sorter: (a, b) => compareText(a.contract_name, b.contract_name),
     },
     {
-      title: '付款阶段',
+      title: '所属阶段',
       dataIndex: 'phase',
-      width: 140,
+      width: 120,
       sorter: (a, b) => compareText(a.phase, b.phase),
       render: (value) => value || '-',
     },
     {
-      title: '计划日期',
+      title: '付款日期',
       dataIndex: 'planned_date',
-      width: 130,
+      width: 120,
       sorter: (a, b) => compareDate(a.planned_date, b.planned_date),
       render: (value) => value || '-',
     },
     {
-      title: '计划金额',
+      title: '合同付款金额',
       dataIndex: 'planned_amount',
-      width: 130,
+      width: 140,
       sorter: (a, b) => compareNumber(a.planned_amount, b.planned_amount),
       render: (value) => `¥${Number(value ?? 0).toLocaleString()}`,
     },
     {
-      title: '实际金额',
+      title: '流程已提金额',
       dataIndex: 'actual_amount',
-      width: 130,
+      width: 140,
       sorter: (a, b) => compareNumber(a.actual_amount, b.actual_amount),
       render: (value) => `¥${Number(value ?? 0).toLocaleString()}`,
     },
     {
-      title: '待付款',
+      title: '待付款金额',
       dataIndex: 'pending_amount',
       width: 130,
       sorter: (a, b) => compareNumber(a.pending_amount, b.pending_amount),
       render: (value) => `¥${Number(value ?? 0).toLocaleString()}`,
     },
     {
-      title: '状态',
+      title: '付款状态',
       dataIndex: 'payment_status',
       width: 110,
       sorter: (a, b) => compareText(a.payment_status, b.payment_status),
@@ -172,12 +197,27 @@ const PaymentsPage = () => {
       ),
     },
     {
+      title: '备注',
+      dataIndex: 'remark',
+      width: 160,
+      ellipsis: true,
+      render: (value) => value || '-',
+    },
+    {
       title: '操作',
-      width: 100,
+      width: 160,
+      fixed: 'right',
       render: (_, record) => (
-        <Button type="link" danger onClick={() => void handleDelete(record.id)}>
-          删除
-        </Button>
+        <Space>
+          {record.payment_status !== '已付款' && (
+            <Button type="link" onClick={() => void handleMarkPaid(record)}>
+              标记已付款
+            </Button>
+          )}
+          <Button type="link" danger onClick={() => void handleDelete(record.id)}>
+            删除
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -212,7 +252,7 @@ const PaymentsPage = () => {
           </Space>
         </div>
 
-        <Table rowKey="id" dataSource={payments} columns={columns} loading={loading} scroll={{ x: 1200 }} />
+        <Table rowKey="id" dataSource={payments} columns={columns} loading={loading} scroll={{ x: 1600 }} />
       </div>
 
       <Modal

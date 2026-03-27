@@ -37,6 +37,7 @@ class ProjectResponse(ProjectBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    contract_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

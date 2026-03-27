@@ -186,6 +186,23 @@ const ContractDetailPage = () => {
     setPaymentDraft({ ...record });
   };
 
+  const markAsPaid = async (record: Payment) => {
+    setSaving(true);
+    try {
+      await updatePayment(record.id, {
+        payment_status: '已付款',
+        actual_amount: record.actual_amount != null ? Number(record.actual_amount) : Number(record.planned_amount ?? 0),
+        actual_date: record.actual_date || new Date().toISOString().slice(0, 10),
+      });
+      message.success('已标记为已付款');
+      void loadContract();
+    } catch (error) {
+      message.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const savePayment = async () => {
     if (!paymentDraft) return;
     setSaving(true);
@@ -472,9 +489,14 @@ const ContractDetailPage = () => {
     },
     {
       title: '操作',
-      width: 150,
+      width: 220,
       render: (_, record) => (
         <Space>
+          {record.payment_status !== '已付款' && (
+            <Button type="link" loading={saving} onClick={() => void markAsPaid(record)}>
+              标记已付款
+            </Button>
+          )}
           <Button type="link" onClick={() => startEditPayment(record)}>
             编辑
           </Button>

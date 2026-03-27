@@ -19,7 +19,9 @@
       "Bash(find /root/projrct-main/frontend/src -name \"*.tsx\" -o -name \"*.ts\" | xargs ls -lt --time=ctime 2>/dev/null | head -20)",
       "Bash(find /root/projrct-main/backend -name \"*.py\" | xargs ls -lt --time=ctime 2>/dev/null | head -20)",
       "Bash(docker compose up --build -d)",
-      "Bash(wc -l backend/app/*.py frontend/src/**/*.tsx frontend/src/**/*.ts)"
+      "Bash(wc -l backend/app/*.py frontend/src/**/*.tsx frontend/src/**/*.ts)",
+      "Bash(npm run:*)",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\胡家兴\\\\Documents\\\\github\\\\project-manage && docker compose ps 2>&1\")"
     ]
   }
 }

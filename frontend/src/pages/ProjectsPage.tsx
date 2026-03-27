@@ -10,16 +10,18 @@ import {
   Modal,
   Select,
   Space,
+  Spin,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { SettingOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, BarsOutlined, SettingOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../api/client';
 import { createProject, deleteProject, fetchProjects, updateProject } from '../services/projects';
 import type { Project } from '../types';
@@ -37,11 +39,12 @@ const T = {
   statusClosed: '\u7ed3\u9879',
   colCode: '\u9879\u76ee\u7f16\u53f7',
   colName: '\u9879\u76ee\u540d\u79f0',
-  colType: '\u5c5e\u6027',
-  colStartDate: '\u7acb\u9879\u65f6\u95f4',
-  colStatus: '\u72b6\u6001',
-  colBudget: '\u91d1\u989d',
+  colStartDate: '\u7acb\u9879\u65e5\u671f',
+  colStatus: '\u9879\u76ee\u72b6\u6001',
+  colBudget: '\u9879\u76ee\u91d1\u989d',
   colManager: '\u8d1f\u8d23\u4eba',
+  colRemark: '\u5907\u6ce8',
+  colContracts: '\u5173\u8054\u5408\u540c',
   colCreatedAt: '\u521b\u5efa\u65f6\u95f4',
   colUpdatedAt: '\u66f4\u65b0\u65f6\u95f4',
   colActions: '\u64cd\u4f5c',
@@ -94,13 +97,14 @@ const PROJECT_LIST_SETTINGS_KEY = 'project-list-settings-v1';
 type ProjectColumnKey =
   | 'project_code'
   | 'project_name'
-  | 'project_type'
   | 'start_date'
   | 'status'
   | 'budget'
-  | 'manager';
+  | 'manager'
+  | 'remark'
+  | 'contracts';
 
-type ProjectSortField = ProjectColumnKey | 'created_at' | 'updated_at';
+type ProjectSortField = Exclude<ProjectColumnKey, 'remark' | 'contracts'> | 'created_at' | 'updated_at';
 
 interface ProjectListSettings {
   visibleColumns: ProjectColumnKey[];
@@ -110,7 +114,7 @@ interface ProjectListSettings {
 }
 
 const DEFAULT_PROJECT_LIST_SETTINGS: ProjectListSettings = {
-  visibleColumns: ['project_code', 'project_name', 'project_type', 'start_date', 'status', 'budget', 'manager'],
+  visibleColumns: ['project_code', 'project_name', 'start_date', 'status', 'budget', 'manager', 'remark', 'contracts'],
   sortField: 'start_date',
   sortOrder: 'descend',
   hiddenStatuses: [T.statusClosed],
@@ -119,17 +123,17 @@ const DEFAULT_PROJECT_LIST_SETTINGS: ProjectListSettings = {
 const COLUMN_OPTIONS: Array<{ label: string; value: ProjectColumnKey }> = [
   { label: T.colCode, value: 'project_code' },
   { label: T.colName, value: 'project_name' },
-  { label: T.colType, value: 'project_type' },
   { label: T.colStartDate, value: 'start_date' },
   { label: T.colStatus, value: 'status' },
   { label: T.colBudget, value: 'budget' },
   { label: T.colManager, value: 'manager' },
+  { label: T.colRemark, value: 'remark' },
+  { label: T.colContracts, value: 'contracts' },
 ];
 
 const SORT_OPTIONS: Array<{ label: string; value: ProjectSortField }> = [
   { label: T.colCode, value: 'project_code' },
   { label: T.colName, value: 'project_name' },
-  { label: T.colType, value: 'project_type' },
   { label: T.colStartDate, value: 'start_date' },
   { label: T.colStatus, value: 'status' },
   { label: T.colBudget, value: 'budget' },
@@ -185,6 +189,7 @@ function writeProjectListSettings(settings: ProjectListSettings) {
 }
 
 const ProjectsPage = () => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -192,6 +197,9 @@ const ProjectsPage = () => {
   const [status, setStatus] = useState<string>();
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
+  const [kanbanProjects, setKanbanProjects] = useState<Project[]>([]);
+  const [kanbanLoading, setKanbanLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
@@ -221,9 +229,25 @@ const ProjectsPage = () => {
     }
   };
 
+  const loadKanbanProjects = async () => {
+    setKanbanLoading(true);
+    try {
+      const result = await fetchProjects({ page: 1, page_size: 1000, search: search || undefined });
+      setKanbanProjects(result.items);
+    } catch (error) {
+      message.error((error as Error).message);
+    } finally {
+      setKanbanLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadProjects();
   }, [page, pageSize, status, search, settings]);
+
+  useEffect(() => {
+    if (viewMode === 'kanban') void loadKanbanProjects();
+  }, [viewMode, search]);
 
   const persistSettings = (nextSettings: ProjectListSettings) => {
     setSettings(nextSettings);
@@ -320,7 +344,7 @@ const ProjectsPage = () => {
         title: T.colName,
         dataIndex: 'project_name',
         key: 'project_name',
-        width: 420,
+        width: 300,
         ellipsis: true,
         sorter: true,
         sortOrder: settings.sortField === 'project_name' ? settings.sortOrder : undefined,
@@ -331,19 +355,10 @@ const ProjectsPage = () => {
         ),
       },
       {
-        title: T.colType,
-        dataIndex: 'project_type',
-        key: 'project_type',
-        width: 140,
-        sorter: true,
-        sortOrder: settings.sortField === 'project_type' ? settings.sortOrder : undefined,
-        render: (value: string | null) => value || '-',
-      },
-      {
         title: T.colStartDate,
         dataIndex: 'start_date',
         key: 'start_date',
-        width: 140,
+        width: 120,
         sorter: true,
         sortOrder: settings.sortField === 'start_date' ? settings.sortOrder : undefined,
         render: (value: string | null) => value || '-',
@@ -370,10 +385,28 @@ const ProjectsPage = () => {
         title: T.colManager,
         dataIndex: 'manager',
         key: 'manager',
-        width: 120,
+        width: 100,
         sorter: true,
         sortOrder: settings.sortField === 'manager' ? settings.sortOrder : undefined,
         render: (value: string | null) => value || '-',
+      },
+      {
+        title: T.colRemark,
+        dataIndex: 'remark',
+        key: 'remark',
+        width: 180,
+        ellipsis: true,
+        render: (value: string | null) => value || '-',
+      },
+      {
+        title: T.colContracts,
+        key: 'contracts',
+        width: 120,
+        render: (_value: unknown, record: Project) => (
+          <Link to={`/projects/${record.id}`}>
+            {record.contract_count != null ? `${record.contract_count} \u4e2a\u5408\u540c` : '\u67e5\u770b'}
+          </Link>
+        ),
       },
     ],
     [settings.sortField, settings.sortOrder],
@@ -447,15 +480,23 @@ const ProjectsPage = () => {
             />
           </div>
           <Space>
-            <Button
-              icon={<SettingOutlined />}
-              onClick={() => {
-                setDraftSettings(settings);
-                setSettingsOpen(true);
-              }}
-            >
-              {T.settingsButton}
-            </Button>
+            <Tooltip title={viewMode === 'table' ? '\u770b\u677f\u89c6\u56fe' : '\u5217\u8868\u89c6\u56fe'}>
+              <Button
+                icon={viewMode === 'table' ? <AppstoreOutlined /> : <BarsOutlined />}
+                onClick={() => setViewMode((m) => (m === 'table' ? 'kanban' : 'table'))}
+              />
+            </Tooltip>
+            {viewMode === 'table' && (
+              <Button
+                icon={<SettingOutlined />}
+                onClick={() => {
+                  setDraftSettings(settings);
+                  setSettingsOpen(true);
+                }}
+              >
+                {T.settingsButton}
+              </Button>
+            )}
             <Button
               onClick={() => {
                 const params = new URLSearchParams({ format: 'xlsx' });
@@ -477,25 +518,74 @@ const ProjectsPage = () => {
           </Space>
         </div>
 
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={projects}
-          loading={loading}
-          scroll={{ x: 1200 }}
-          onChange={handleTableChange}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            showTotal: (value: number) => `${T.total} ${value} ${T.items}`,
-            onChange: (nextPage, nextPageSize) => {
-              setPage(nextPage);
-              setPageSize(nextPageSize);
-            },
-          }}
-        />
+        {viewMode === 'kanban' ? (
+          <Spin spinning={kanbanLoading}>
+            <div className="kanban-board">
+              {PROJECT_STATUSES.map((colStatus) => {
+                const colProjects = kanbanProjects.filter((p) => p.status === colStatus);
+                return (
+                  <div key={colStatus} className="kanban-col">
+                    <div className="kanban-col-header">
+                      <Typography.Text strong>{colStatus}</Typography.Text>
+                      <Tag>{colProjects.length}</Tag>
+                    </div>
+                    {colProjects.map((project) => (
+                      <div
+                        key={project.id}
+                        className="kanban-card"
+                        onClick={() => navigate(`/projects/${project.id}`)}
+                      >
+                        <div className="kanban-card-name" title={project.project_name}>
+                          {project.project_name}
+                        </div>
+                        <div className="kanban-card-code">{project.project_code}</div>
+                        <div className="kanban-card-meta">
+                          <span>{project.manager || '\u65e0\u8d1f\u8d23\u4eba'}</span>
+                          <span>
+                            {project.budget != null ? `\u00a5${Number(project.budget).toLocaleString()}` : '-'}
+                          </span>
+                        </div>
+                        <div className="kanban-card-meta" style={{ marginTop: 6 }}>
+                          <Tag color="blue" style={{ margin: 0, fontSize: 11 }}>
+                            {project.contract_count ?? 0} \u4e2a\u5408\u540c
+                          </Tag>
+                          {project.start_date && (
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>{project.start_date}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {colProjects.length === 0 && (
+                      <div style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
+                        \u6682\u65e0\u9879\u76ee
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Spin>
+        ) : (
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={projects}
+            loading={loading}
+            scroll={{ x: 1200 }}
+            onChange={handleTableChange}
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              showSizeChanger: true,
+              showTotal: (value: number) => `${T.total} ${value} ${T.items}`,
+              onChange: (nextPage, nextPageSize) => {
+                setPage(nextPage);
+                setPageSize(nextPageSize);
+              },
+            }}
+          />
+        )}
       </div>
 
       <Drawer

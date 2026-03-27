@@ -1,12 +1,12 @@
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import type { ColumnsType, ExpandableConfig } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../api/client';
 import { createContract, fetchContracts } from '../services/contracts';
 import { fetchProjects } from '../services/projects';
-import type { Contract, Project } from '../types';
+import type { Contract, Payment, Project } from '../types';
 
 const CONTRACT_STATUSES = ['草拟', '签订', '服务中', '执行中', '归档'];
 
@@ -90,53 +90,110 @@ const ContractsPage = () => {
     }
   };
 
+  const paymentColumns: ColumnsType<Payment> = [
+    { title: '所属阶段', dataIndex: 'phase', width: 120, render: (v) => v || '-' },
+    { title: '付款日期', dataIndex: 'planned_date', width: 110, render: (v) => v || '-' },
+    {
+      title: '合同付款金额',
+      dataIndex: 'planned_amount',
+      width: 130,
+      render: (v) => `¥${Number(v ?? 0).toLocaleString()}`,
+    },
+    {
+      title: '流程已提金额',
+      dataIndex: 'actual_amount',
+      width: 130,
+      render: (v) => `¥${Number(v ?? 0).toLocaleString()}`,
+    },
+    {
+      title: '待付款金额',
+      dataIndex: 'pending_amount',
+      width: 120,
+      render: (v) => `¥${Number(v ?? 0).toLocaleString()}`,
+    },
+    {
+      title: '付款状态',
+      dataIndex: 'payment_status',
+      width: 100,
+      render: (v: string) => (
+        <Tag color={v === '已付款' ? 'success' : v === '已提报' ? 'processing' : 'default'}>{v}</Tag>
+      ),
+    },
+    { title: '备注', dataIndex: 'remark', ellipsis: true, render: (v) => v || '-' },
+  ];
+
+  const expandable: ExpandableConfig<Contract> = {
+    expandedRowRender: (record) => (
+      <Table
+        rowKey="id"
+        size="small"
+        dataSource={record.payments}
+        columns={paymentColumns}
+        pagination={false}
+        locale={{ emptyText: '暂无付款记录' }}
+        style={{ margin: '0 0 4px' }}
+      />
+    ),
+    rowExpandable: (record) => record.payments.length > 0,
+  };
+
   const columns: ColumnsType<Contract> = [
     {
       title: '合同编号',
       dataIndex: 'contract_code',
-      width: 220,
+      width: 200,
       sorter: (a, b) => compareText(a.contract_code, b.contract_code),
       render: (_, record) => <Link to={`/contracts/${record.id}`}>{record.contract_code}</Link>,
     },
     {
       title: '合同名称',
       dataIndex: 'contract_name',
+      ellipsis: true,
       sorter: (a, b) => compareText(a.contract_name, b.contract_name),
     },
     {
-      title: '所属项目',
+      title: '关联项目',
       dataIndex: 'project_id',
-      width: 220,
+      width: 200,
+      ellipsis: true,
       sorter: (a, b) => compareText(projectNameMap.get(a.project_id), projectNameMap.get(b.project_id)),
       render: (value: number) => projectNameMap.get(value) || '-',
     },
     {
-      title: '供应商',
-      dataIndex: 'vendor',
-      width: 220,
-      sorter: (a, b) => compareText(a.vendor, b.vendor),
-      render: (value) => value || '-',
+      title: '合同状态',
+      dataIndex: 'status',
+      width: 110,
+      sorter: (a, b) => compareText(a.status, b.status),
+      render: (value: string) => <Tag color={statusColorMap[value] ?? 'default'}>{value}</Tag>,
     },
     {
-      title: '签订日期',
+      title: '签订时间',
       dataIndex: 'sign_date',
-      width: 140,
+      width: 120,
       sorter: (a, b) => compareDate(a.sign_date, b.sign_date),
       render: (value) => value || '-',
     },
     {
-      title: '金额',
+      title: '合同金额',
       dataIndex: 'amount',
       width: 140,
       sorter: (a, b) => compareNumber(a.amount, b.amount),
       render: (value) => `¥${Number(value).toLocaleString()}`,
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      width: 120,
-      sorter: (a, b) => compareText(a.status, b.status),
-      render: (value: string) => <Tag color={statusColorMap[value] ?? 'default'}>{value}</Tag>,
+      title: '承建方',
+      dataIndex: 'vendor',
+      width: 180,
+      ellipsis: true,
+      sorter: (a, b) => compareText(a.vendor, b.vendor),
+      render: (value) => value || '-',
+    },
+    {
+      title: '备注',
+      dataIndex: 'remark',
+      width: 180,
+      ellipsis: true,
+      render: (value) => value || '-',
     },
   ];
 
@@ -186,7 +243,7 @@ const ContractsPage = () => {
           </Space>
         </div>
 
-        <Table rowKey="id" dataSource={dataSource} columns={columns} loading={loading} scroll={{ x: 1200 }} />
+        <Table rowKey="id" dataSource={dataSource} columns={columns} loading={loading} scroll={{ x: 1200 }} expandable={expandable} />
       </div>
 
       <Modal

@@ -1,10 +1,11 @@
-import { Card, Descriptions, Progress, Skeleton, Statistic, Table, Tag, Typography, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Button, Card, Descriptions, Progress, Skeleton, Space, Statistic, Table, Tag, Typography, message } from 'antd';
+import type { ColumnsType, ExpandableConfig } from 'antd/es/table';
+import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { fetchContracts } from '../services/contracts';
-import { fetchProject } from '../services/projects';
-import type { Contract, Project } from '../types';
+import { fetchProject, fetchProjects } from '../services/projects';
+import type { Contract, Payment, Project } from '../types';
 
 function compareText(a?: string | null, b?: string | null) {
   return (a ?? '').localeCompare(b ?? '', 'zh-CN');
@@ -15,10 +16,13 @@ function compareNumber(a?: number | null, b?: number | null) {
 }
 
 const ProjectDetailPage = () => {
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
+  const [prevId, setPrevId] = useState<number | null>(null);
+  const [nextId, setNextId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -26,9 +30,17 @@ const ProjectDetailPage = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [projectDetail, contractList] = await Promise.all([fetchProject(Number(id)), fetchContracts()]);
+        const [projectDetail, contractList, allProjects] = await Promise.all([
+          fetchProject(Number(id)),
+          fetchContracts(),
+          fetchProjects({ page: 1, page_size: 1000, sort_field: 'start_date', sort_order: 'desc' }),
+        ]);
         setProject(projectDetail);
         setContracts(contractList.filter((item) => item.project_id === Number(id)));
+        const ids = allProjects.items.map((p) => p.id);
+        const idx = ids.indexOf(Number(id));
+        setPrevId(idx > 0 ? ids[idx - 1] : null);
+        setNextId(idx < ids.length - 1 ? ids[idx + 1] : null);
       } catch (error) {
         message.error((error as Error).message);
       } finally {
@@ -52,6 +64,53 @@ const ProjectDetailPage = () => {
     const progress = totalContractAmount ? Math.round((totalPaid / totalContractAmount) * 100) : 0;
     return { totalContractAmount, totalPaid, totalPending, progress };
   }, [contracts]);
+
+  const paymentColumns: ColumnsType<Payment> = [
+    { title: '所属阶段', dataIndex: 'phase', width: 120, render: (v) => v || '-' },
+    { title: '付款日期', dataIndex: 'planned_date', width: 110, render: (v) => v || '-' },
+    {
+      title: '合同付款金额',
+      dataIndex: 'planned_amount',
+      width: 130,
+      render: (v) => `¥${Number(v ?? 0).toLocaleString()}`,
+    },
+    {
+      title: '流程已提金额',
+      dataIndex: 'actual_amount',
+      width: 130,
+      render: (v) => `¥${Number(v ?? 0).toLocaleString()}`,
+    },
+    {
+      title: '待付款金额',
+      dataIndex: 'pending_amount',
+      width: 120,
+      render: (v) => `¥${Number(v ?? 0).toLocaleString()}`,
+    },
+    {
+      title: '付款状态',
+      dataIndex: 'payment_status',
+      width: 100,
+      render: (v: string) => (
+        <Tag color={v === '已付款' ? 'success' : v === '已提报' ? 'processing' : 'default'}>{v}</Tag>
+      ),
+    },
+    { title: '备注', dataIndex: 'remark', ellipsis: true, render: (v) => v || '-' },
+  ];
+
+  const contractExpandable: ExpandableConfig<Contract> = {
+    expandedRowRender: (record) => (
+      <Table
+        rowKey="id"
+        size="small"
+        dataSource={record.payments}
+        columns={paymentColumns}
+        pagination={false}
+        locale={{ emptyText: '暂无付款记录' }}
+        style={{ margin: '0 0 4px' }}
+      />
+    ),
+    rowExpandable: (record) => record.payments.length > 0,
+  };
 
   const columns: ColumnsType<Contract> = [
     {
@@ -99,7 +158,28 @@ const ProjectDetailPage = () => {
 
   return (
     <div className="detail-stack">
-      <Card className="page-panel" title={`项目详情：${project.project_name}`}>
+      <Card
+        className="page-panel"
+        title={`项目详情：${project.project_name}`}
+        extra={
+          <Space>
+            <Button
+              icon={<LeftOutlined />}
+              disabled={!prevId}
+              onClick={() => prevId && navigate(`/projects/${prevId}`)}
+            >
+              上一个
+            </Button>
+            <Button
+              icon={<RightOutlined />}
+              disabled={!nextId}
+              onClick={() => nextId && navigate(`/projects/${nextId}`)}
+            >
+              下一个
+            </Button>
+          </Space>
+        }
+      >
         <Descriptions column={3}>
           <Descriptions.Item label="项目编号">{project.project_code}</Descriptions.Item>
           <Descriptions.Item label="项目属性">{project.project_type || '-'}</Descriptions.Item>
@@ -143,6 +223,7 @@ const ProjectDetailPage = () => {
           rowKey="id"
           dataSource={contracts}
           columns={columns}
+          expandable={contractExpandable}
           pagination={false}
           scroll={{ x: 1000 }}
           locale={{ emptyText: '暂无合同' }}

@@ -10,6 +10,7 @@ export interface Project {
   remark: string | null;
   created_at: string;
   updated_at: string;
+  contract_count?: number;
 }
 
 export interface ProjectCreate {

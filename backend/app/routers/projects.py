@@ -1,7 +1,7 @@
 """项目管理路由。"""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -58,7 +58,25 @@ def list_projects(
         query = query.order_by(sort_column.desc(), models.Project.id.desc())
 
     items = query.offset((page - 1) * page_size).limit(page_size).all()
-    return schemas.ProjectListResponse(total=total, page=page, page_size=page_size, items=items)
+
+    project_ids = [p.id for p in items]
+    counts: dict[int, int] = {}
+    if project_ids:
+        rows = (
+            db.query(models.Contract.project_id, func.count(models.Contract.id))
+            .filter(models.Contract.project_id.in_(project_ids))
+            .group_by(models.Contract.project_id)
+            .all()
+        )
+        counts = {row[0]: row[1] for row in rows}
+
+    response_items = []
+    for p in items:
+        item = schemas.ProjectResponse.model_validate(p)
+        item.contract_count = counts.get(p.id, 0)
+        response_items.append(item)
+
+    return schemas.ProjectListResponse(total=total, page=page, page_size=page_size, items=response_items)
 
 
 @router.get("/{project_id}", response_model=schemas.ProjectResponse)
@@ -67,7 +85,9 @@ def get_project(project_id: int, db: Session = Depends(get_db)):
     project = db.query(models.Project).filter(models.Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="项目不存在")
-    return project
+    item = schemas.ProjectResponse.model_validate(project)
+    item.contract_count = len(project.contracts)
+    return item
 
 
 @router.post("", response_model=schemas.ProjectResponse)
