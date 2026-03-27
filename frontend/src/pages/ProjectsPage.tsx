@@ -175,9 +175,21 @@ const ProjectsPage = () => {
               }}
             />
           </div>
-          <Button type="primary" onClick={openCreateModal}>
-            新建项目
-          </Button>
+          <Space>
+            <Button
+              onClick={() => {
+                const params = new URLSearchParams({ format: 'xlsx' });
+                if (search) params.set('search', search);
+                if (status) params.set('status', status);
+                window.open(`http://localhost:8000/api/export/projects?${params.toString()}`, '_blank');
+              }}
+            >
+              导出
+            </Button>
+            <Button type="primary" onClick={openCreateModal}>
+              新建项目
+            </Button>
+          </Space>
         </div>
 
         <Table

@@ -1,5 +1,5 @@
 import { InboxOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Form, Input, InputNumber, Space, Table, Typography, Upload, message } from 'antd';
+import { Alert, Button, Card, Form, Input, InputNumber, Radio, Select, Space, Table, Typography, Upload, message } from 'antd';
 import type { UploadFile } from 'antd/es/upload/interface';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -78,6 +78,16 @@ const highlightStyle = {
 
 const ImportsPage = () => {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [excelFileList, setExcelFileList] = useState<UploadFile[]>([]);
+  const [importEntity, setImportEntity] = useState<'projects' | 'contracts' | 'payments'>('projects');
+  const [duplicateAction, setDuplicateAction] = useState<'skip' | 'update'>('skip');
+  const [excelImportLoading, setExcelImportLoading] = useState(false);
+  const [excelResult, setExcelResult] = useState<{
+    success: number;
+    failed: number;
+    skipped: number;
+    errors: { row: number; message: string }[];
+  } | null>(null);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [uncertainFields, setUncertainFields] = useState<string[]>([]);
   const [recognizing, setRecognizing] = useState(false);
@@ -170,6 +180,34 @@ const ImportsPage = () => {
     }
   };
 
+  const downloadTemplate = (entity: 'projects' | 'contracts' | 'payments') => {
+    window.open(`http://localhost:8000/api/import/template/${entity}`, '_blank');
+  };
+
+  const startExcelImport = async () => {
+    const file = excelFileList[0]?.originFileObj as File | undefined;
+    if (!file) {
+      message.warning('请先选择 Excel 文件');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setExcelImportLoading(true);
+    try {
+      const response = await client.post(`/import/excel/${importEntity}?duplicate_action=${duplicateAction}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setExcelResult(response.data);
+      message.success('Excel 导入完成');
+    } catch (error) {
+      message.error((error as Error).message);
+    } finally {
+      setExcelImportLoading(false);
+    }
+  };
+
   return (
     <div className="detail-stack">
       <div>
@@ -180,6 +218,71 @@ const ImportsPage = () => {
           支持上传或粘贴 OA 合同截图，识别后可人工校正再导入数据库。
         </Typography.Text>
       </div>
+
+      <Card className="page-panel" title="Excel导入">
+        <Space direction="vertical" style={{ width: '100%' }} size={16}>
+          <Space wrap>
+            <Button onClick={() => downloadTemplate('projects')}>下载项目模板</Button>
+            <Button onClick={() => downloadTemplate('contracts')}>下载合同模板</Button>
+            <Button onClick={() => downloadTemplate('payments')}>下载付款模板</Button>
+          </Space>
+          <Space wrap>
+            <Radio.Group
+              value={importEntity}
+              onChange={(event) => setImportEntity(event.target.value)}
+              options={[
+                { label: '项目', value: 'projects' },
+                { label: '合同', value: 'contracts' },
+                { label: '付款', value: 'payments' },
+              ]}
+            />
+            <Select
+              value={duplicateAction}
+              style={{ width: 220 }}
+              onChange={(value) => setDuplicateAction(value)}
+              options={[
+                { label: '重复编号跳过', value: 'skip' },
+                { label: '重复编号更新', value: 'update' },
+              ]}
+            />
+          </Space>
+          <Upload.Dragger
+            accept=".xlsx"
+            beforeUpload={() => false}
+            maxCount={1}
+            fileList={excelFileList}
+            onChange={({ fileList: nextFileList }) => setExcelFileList(nextFileList)}
+          >
+            <p className="ant-upload-text">点击或拖拽 Excel 文件到此区域上传</p>
+            <p className="ant-upload-hint">仅支持 .xlsx 格式</p>
+          </Upload.Dragger>
+          <Space>
+            <Button type="primary" loading={excelImportLoading} onClick={() => void startExcelImport()}>
+              开始 Excel 导入
+            </Button>
+            <Button onClick={() => setExcelFileList([])}>清空文件</Button>
+          </Space>
+          {excelResult && (
+            <Card size="small" title="导入结果">
+              <Space wrap size="large" style={{ marginBottom: 12 }}>
+                <Typography.Text>成功：{excelResult.success}</Typography.Text>
+                <Typography.Text>失败：{excelResult.failed}</Typography.Text>
+                <Typography.Text>跳过：{excelResult.skipped}</Typography.Text>
+              </Space>
+              <Table
+                rowKey={(record) => `${record.row}-${record.message}`}
+                dataSource={excelResult.errors}
+                pagination={false}
+                locale={{ emptyText: '没有错误明细' }}
+                columns={[
+                  { title: '行号', dataIndex: 'row', width: 120 },
+                  { title: '错误信息', dataIndex: 'message' },
+                ]}
+              />
+            </Card>
+          )}
+        </Space>
+      </Card>
 
       <Card className="page-panel" title="AI截图识别">
         <Space direction="vertical" style={{ width: '100%' }} size={16}>

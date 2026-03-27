@@ -1,4 +1,4 @@
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Table, Tag, Typography, message } from 'antd';
+import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 import { createPayment, deletePayment, fetchPayments } from '../services/payments';
@@ -137,15 +137,20 @@ const PaymentsPage = () => {
       <div className="page-panel" style={{ padding: 20 }}>
         <div className="action-bar">
           <div className="action-left" />
-          <Button
-            type="primary"
-            onClick={() => {
-              form.resetFields();
-              setModalOpen(true);
-            }}
-          >
-            新建付款
-          </Button>
+          <Space>
+            <Button onClick={() => window.open('http://localhost:8000/api/export/payments?format=xlsx', '_blank')}>
+              导出
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                form.resetFields();
+                setModalOpen(true);
+              }}
+            >
+              新建付款
+            </Button>
+          </Space>
         </div>
 
         <Table rowKey="id" dataSource={payments} columns={columns} loading={loading} />
