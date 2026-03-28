@@ -86,6 +86,11 @@ ANTHROPIC_API_KEY=你的_Anthropic_API_Key
 - Swagger UI：<http://localhost:8000/docs>
 - ReDoc：<http://localhost:8000/redoc>
 
+## 补充文档
+
+- [运行方式、沙箱与局域网访问说明](docs/runtime-and-lan.md)
+- [前后端接口文档](docs/frontend-backend-api.md)
+
 ## 目录结构
 
 ```text
