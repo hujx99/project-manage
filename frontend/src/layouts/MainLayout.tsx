@@ -7,9 +7,10 @@ import {
   MenuUnfoldOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
-import { Button, Layout, Menu, Typography } from 'antd';
-import { useState } from 'react';
+import { Button, Drawer, Layout, Menu, Typography } from 'antd';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
+import useIsMobile from '../hooks/useIsMobile';
 
 const { Header, Sider, Content } = Layout;
 
@@ -40,38 +41,56 @@ function getSelectedKey(pathname: string) {
 
 const MainLayout = () => {
   const location = useLocation();
+  const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [isMobile, location.pathname]);
+
+  const selectedKey = getSelectedKey(location.pathname);
+  const navMenu = (
+    <Menu
+      theme="dark"
+      mode="inline"
+      inlineCollapsed={!isMobile && collapsed}
+      selectedKeys={[selectedKey]}
+      items={menuItems}
+      onClick={() => {
+        if (isMobile) {
+          setMobileNavOpen(false);
+        }
+      }}
+    />
+  );
 
   return (
     <Layout className="shell-layout">
-      <Sider
-        collapsible
-        trigger={null}
-        collapsed={collapsed}
-        width={240}
-        collapsedWidth={76}
-        className="shell-sider"
-      >
-        <div className={`shell-brand ${collapsed ? 'is-collapsed' : ''}`}>
-          <div className="shell-brand-badge">PM</div>
-          {!collapsed && (
-            <div className="shell-brand-copy">
-              <Typography.Title level={4} className="shell-brand-title">
-                {TEXT.brandTitle}
-              </Typography.Title>
-              <Typography.Text className="shell-brand-subtitle">{TEXT.brandSubtitle}</Typography.Text>
-            </div>
-          )}
-        </div>
+      {!isMobile && (
+        <Sider
+          collapsible
+          trigger={null}
+          collapsed={collapsed}
+          width={240}
+          collapsedWidth={76}
+          className="shell-sider"
+        >
+          <div className={`shell-brand ${collapsed ? 'is-collapsed' : ''}`}>
+            <div className="shell-brand-badge">PM</div>
+            {!collapsed && (
+              <div className="shell-brand-copy">
+                <Typography.Title level={4} className="shell-brand-title">
+                  {TEXT.brandTitle}
+                </Typography.Title>
+                <Typography.Text className="shell-brand-subtitle">{TEXT.brandSubtitle}</Typography.Text>
+              </div>
+            )}
+          </div>
 
-        <Menu
-          theme="dark"
-          mode="inline"
-          inlineCollapsed={collapsed}
-          selectedKeys={[getSelectedKey(location.pathname)]}
-          items={menuItems}
-        />
-      </Sider>
+          {navMenu}
+        </Sider>
+      )}
 
       <Layout>
         <Header className="shell-header">
@@ -79,8 +98,14 @@ const MainLayout = () => {
             <Button
               type="text"
               className="shell-header-trigger"
-              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              onClick={() => setCollapsed((value) => !value)}
+              icon={isMobile || collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={() => {
+                if (isMobile) {
+                  setMobileNavOpen(true);
+                  return;
+                }
+                setCollapsed((value) => !value);
+              }}
             />
             <div className="shell-header-copy">
               <Typography.Title level={4} className="shell-header-title">
@@ -96,6 +121,30 @@ const MainLayout = () => {
           <Outlet />
         </Content>
       </Layout>
+
+      {isMobile && (
+        <Drawer
+          placement="left"
+          open={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
+          width={280}
+          className="shell-mobile-drawer"
+          title={null}
+          closable={false}
+          styles={{ body: { padding: 0 } }}
+        >
+          <div className="shell-brand">
+            <div className="shell-brand-badge">PM</div>
+            <div className="shell-brand-copy">
+              <Typography.Title level={4} className="shell-brand-title">
+                {TEXT.brandTitle}
+              </Typography.Title>
+              <Typography.Text className="shell-brand-subtitle">{TEXT.brandSubtitle}</Typography.Text>
+            </div>
+          </div>
+          <div className="shell-mobile-nav">{navMenu}</div>
+        </Drawer>
+      )}
     </Layout>
   );
 };

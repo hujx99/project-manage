@@ -1,8 +1,9 @@
 import { Button, Card, Descriptions, Progress, Skeleton, Space, Statistic, Table, Tag, Typography, message } from 'antd';
-import type { ColumnsType, ExpandableConfig } from 'antd/es/table';
+import type { ColumnsType, TableProps } from 'antd/es/table';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import useIsMobile from '../hooks/useIsMobile';
 import { fetchContracts } from '../services/contracts';
 import { fetchProject, fetchProjects } from '../services/projects';
 import type { Contract, Payment, Project } from '../types';
@@ -17,6 +18,7 @@ function compareNumber(a?: number | null, b?: number | null) {
 
 const ProjectDetailPage = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -78,6 +80,7 @@ const ProjectDetailPage = () => {
       title: '流程已提金额',
       dataIndex: 'actual_amount',
       width: 130,
+      responsive: ['md'],
       render: (v) => `¥${Number(v ?? 0).toLocaleString()}`,
     },
     {
@@ -94,10 +97,10 @@ const ProjectDetailPage = () => {
         <Tag color={v === '已付款' ? 'success' : v === '已提报' ? 'processing' : 'default'}>{v}</Tag>
       ),
     },
-    { title: '备注', dataIndex: 'remark', ellipsis: true, render: (v) => v || '-' },
+    { title: '备注', dataIndex: 'remark', ellipsis: true, responsive: ['lg'], render: (v) => v || '-' },
   ];
 
-  const contractExpandable: ExpandableConfig<Contract> = {
+  const contractExpandable: TableProps<Contract>['expandable'] = {
     expandedRowRender: (record) => (
       <Table
         rowKey="id"
@@ -105,6 +108,7 @@ const ProjectDetailPage = () => {
         dataSource={record.payments}
         columns={paymentColumns}
         pagination={false}
+        scroll={{ x: 760 }}
         locale={{ emptyText: '暂无付款记录' }}
         style={{ margin: '0 0 4px' }}
       />
@@ -117,6 +121,7 @@ const ProjectDetailPage = () => {
       title: '合同编号',
       dataIndex: 'contract_code',
       width: 220,
+      responsive: ['md'],
       sorter: (a, b) => compareText(a.contract_code, b.contract_code),
       render: (_, record) => <Link to={`/contracts/${record.id}`}>{record.contract_code}</Link>,
     },
@@ -124,11 +129,25 @@ const ProjectDetailPage = () => {
       title: '合同名称',
       dataIndex: 'contract_name',
       sorter: (a, b) => compareText(a.contract_name, b.contract_name),
+      render: (value: string, record) => (
+        <div className="table-cell-stack">
+          <Link to={`/contracts/${record.id}`} className="table-link-ellipsis table-cell-title" title={value}>
+            {value}
+          </Link>
+          {isMobile && (
+            <>
+              <span className="table-cell-subtitle">{record.contract_code}</span>
+              <span className="table-cell-meta">{record.vendor || '-'}</span>
+            </>
+          )}
+        </div>
+      ),
     },
     {
       title: '供应商',
       dataIndex: 'vendor',
       width: 220,
+      responsive: ['lg'],
       sorter: (a, b) => compareText(a.vendor, b.vendor),
       render: (value) => value || '-',
     },
@@ -143,6 +162,7 @@ const ProjectDetailPage = () => {
       title: '状态',
       dataIndex: 'status',
       width: 120,
+      responsive: ['sm'],
       sorter: (a, b) => compareText(a.status, b.status),
       render: (value) => <Tag>{value}</Tag>,
     },
@@ -162,7 +182,7 @@ const ProjectDetailPage = () => {
         className="page-panel"
         title={`项目详情：${project.project_name}`}
         extra={
-          <Space>
+          <Space wrap className="card-extra-actions">
             <Button
               icon={<LeftOutlined />}
               disabled={!prevId}
@@ -180,7 +200,7 @@ const ProjectDetailPage = () => {
           </Space>
         }
       >
-        <Descriptions column={3}>
+        <Descriptions className="detail-descriptions" column={{ xs: 1, sm: 1, md: 2, lg: 3 }}>
           <Descriptions.Item label="项目编号">{project.project_code}</Descriptions.Item>
           <Descriptions.Item label="项目属性">{project.project_type || '-'}</Descriptions.Item>
           <Descriptions.Item label="项目状态">
@@ -225,7 +245,8 @@ const ProjectDetailPage = () => {
           columns={columns}
           expandable={contractExpandable}
           pagination={false}
-          scroll={{ x: 1000 }}
+          size={isMobile ? 'small' : 'middle'}
+          scroll={{ x: isMobile ? 760 : 1000 }}
           locale={{ emptyText: '暂无合同' }}
         />
       </Card>

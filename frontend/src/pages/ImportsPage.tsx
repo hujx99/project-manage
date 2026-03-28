@@ -4,6 +4,7 @@ import type { UploadFile } from 'antd/es/upload/interface';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client, { API_BASE_URL } from '../api/client';
+import useIsMobile from '../hooks/useIsMobile';
 
 interface ParsedContract {
   contract_code?: string | null;
@@ -77,6 +78,7 @@ const highlightStyle = {
 };
 
 const ImportsPage = () => {
+  const isMobile = useIsMobile();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [excelFileList, setExcelFileList] = useState<UploadFile[]>([]);
   const [importEntity, setImportEntity] = useState<'projects' | 'contracts' | 'payments'>('projects');
@@ -221,7 +223,7 @@ const ImportsPage = () => {
 
       <Card className="page-panel" title="Excel导入">
         <Space direction="vertical" style={{ width: '100%' }} size={16}>
-          <Space wrap>
+          <Space wrap className="action-right">
             <Button onClick={() => downloadTemplate('projects')}>下载项目模板</Button>
             <Button onClick={() => downloadTemplate('contracts')}>下载合同模板</Button>
             <Button onClick={() => downloadTemplate('payments')}>下载付款模板</Button>
@@ -238,7 +240,7 @@ const ImportsPage = () => {
             />
             <Select
               value={duplicateAction}
-              style={{ width: 220 }}
+              style={{ width: isMobile ? '100%' : 220 }}
               onChange={(value) => setDuplicateAction(value)}
               options={[
                 { label: '重复编号跳过', value: 'skip' },
@@ -256,7 +258,7 @@ const ImportsPage = () => {
             <p className="ant-upload-text">点击或拖拽 Excel 文件到此区域上传</p>
             <p className="ant-upload-hint">仅支持 .xlsx 格式</p>
           </Upload.Dragger>
-          <Space>
+          <Space wrap className="action-right">
             <Button type="primary" loading={excelImportLoading} onClick={() => void startExcelImport()}>
               开始 Excel 导入
             </Button>
@@ -273,6 +275,8 @@ const ImportsPage = () => {
                 rowKey={(record) => `${record.row}-${record.message}`}
                 dataSource={excelResult.errors}
                 pagination={false}
+                size={isMobile ? 'small' : 'middle'}
+                scroll={{ x: 520 }}
                 locale={{ emptyText: '没有错误明细' }}
                 columns={[
                   { title: '行号', dataIndex: 'row', width: 120 },
@@ -304,7 +308,7 @@ const ImportsPage = () => {
             <p className="ant-upload-text">点击或拖拽截图到此区域上传</p>
             <p className="ant-upload-hint">支持多张截图联合识别</p>
           </Upload.Dragger>
-          <Space>
+          <Space wrap className="action-right">
             <Button type="primary" loading={recognizing} onClick={() => void startRecognition()}>
               开始识别
             </Button>
@@ -391,6 +395,8 @@ const ImportsPage = () => {
                     <Table
                       rowKey="key"
                       pagination={false}
+                      size={isMobile ? 'small' : 'middle'}
+                      scroll={{ x: 860 }}
                       dataSource={fields}
                       columns={[
                         {
@@ -466,6 +472,8 @@ const ImportsPage = () => {
                     <Table
                       rowKey="key"
                       pagination={false}
+                      size={isMobile ? 'small' : 'middle'}
+                      scroll={{ x: 820 }}
                       dataSource={fields}
                       columns={[
                         {
@@ -541,6 +549,8 @@ const ImportsPage = () => {
                     <Table
                       rowKey="key"
                       pagination={false}
+                      size={isMobile ? 'small' : 'middle'}
+                      scroll={{ x: 780 }}
                       dataSource={fields}
                       columns={[
                         {
@@ -594,7 +604,7 @@ const ImportsPage = () => {
               </Form.List>
             </Form>
 
-            <Space>
+            <Space wrap className="action-right">
               <Button type="primary" loading={submitting} onClick={() => void confirmImport()}>
                 导入
               </Button>

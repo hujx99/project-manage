@@ -1,9 +1,10 @@
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
-import type { ColumnsType, ExpandableConfig } from 'antd/es/table';
+import type { ColumnsType, TableProps } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../api/client';
+import useIsMobile from '../hooks/useIsMobile';
 import { createContract, fetchContracts } from '../services/contracts';
 import { fetchProjects } from '../services/projects';
 import type { Contract, Payment, Project } from '../types';
@@ -31,6 +32,7 @@ function compareDate(a?: string | null, b?: string | null) {
 }
 
 const ContractsPage = () => {
+  const isMobile = useIsMobile();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectFilter, setProjectFilter] = useState<number>();
@@ -103,6 +105,7 @@ const ContractsPage = () => {
       title: '流程已提金额',
       dataIndex: 'actual_amount',
       width: 130,
+      responsive: ['md'],
       render: (v) => `¥${Number(v ?? 0).toLocaleString()}`,
     },
     {
@@ -119,10 +122,10 @@ const ContractsPage = () => {
         <Tag color={v === '已付款' ? 'success' : v === '已提报' ? 'processing' : 'default'}>{v}</Tag>
       ),
     },
-    { title: '备注', dataIndex: 'remark', ellipsis: true, render: (v) => v || '-' },
+    { title: '备注', dataIndex: 'remark', ellipsis: true, responsive: ['lg'], render: (v) => v || '-' },
   ];
 
-  const expandable: ExpandableConfig<Contract> = {
+  const expandable: TableProps<Contract>['expandable'] = {
     expandedRowRender: (record) => (
       <Table
         rowKey="id"
@@ -130,6 +133,7 @@ const ContractsPage = () => {
         dataSource={record.payments}
         columns={paymentColumns}
         pagination={false}
+        scroll={{ x: 760 }}
         locale={{ emptyText: '暂无付款记录' }}
         style={{ margin: '0 0 4px' }}
       />
@@ -142,6 +146,7 @@ const ContractsPage = () => {
       title: '合同编号',
       dataIndex: 'contract_code',
       width: 200,
+      responsive: ['md'],
       sorter: (a, b) => compareText(a.contract_code, b.contract_code),
       render: (_, record) => <Link to={`/contracts/${record.id}`}>{record.contract_code}</Link>,
     },
@@ -150,11 +155,25 @@ const ContractsPage = () => {
       dataIndex: 'contract_name',
       ellipsis: true,
       sorter: (a, b) => compareText(a.contract_name, b.contract_name),
+      render: (value: string, record) => (
+        <div className="table-cell-stack">
+          <Link to={`/contracts/${record.id}`} className="table-link-ellipsis table-cell-title" title={value}>
+            {value}
+          </Link>
+          {isMobile && (
+            <>
+              <span className="table-cell-subtitle">{record.contract_code}</span>
+              <span className="table-cell-meta">{projectNameMap.get(record.project_id) || '-'}</span>
+            </>
+          )}
+        </div>
+      ),
     },
     {
       title: '关联项目',
       dataIndex: 'project_id',
       width: 200,
+      responsive: ['lg'],
       ellipsis: true,
       sorter: (a, b) => compareText(projectNameMap.get(a.project_id), projectNameMap.get(b.project_id)),
       render: (value: number) => projectNameMap.get(value) || '-',
@@ -170,6 +189,7 @@ const ContractsPage = () => {
       title: '签订时间',
       dataIndex: 'sign_date',
       width: 120,
+      responsive: ['md'],
       sorter: (a, b) => compareDate(a.sign_date, b.sign_date),
       render: (value) => value || '-',
     },
@@ -184,6 +204,7 @@ const ContractsPage = () => {
       title: '承建方',
       dataIndex: 'vendor',
       width: 180,
+      responsive: ['xl'],
       ellipsis: true,
       sorter: (a, b) => compareText(a.vendor, b.vendor),
       render: (value) => value || '-',
@@ -192,6 +213,7 @@ const ContractsPage = () => {
       title: '备注',
       dataIndex: 'remark',
       width: 180,
+      responsive: ['xl'],
       ellipsis: true,
       render: (value) => value || '-',
     },
@@ -208,7 +230,7 @@ const ContractsPage = () => {
         </Typography.Text>
       </div>
 
-      <div className="page-panel" style={{ padding: 20 }}>
+      <div className="page-panel" style={{ padding: isMobile ? 16 : 20 }}>
         <div className="action-bar">
           <div className="action-left">
             <Select
@@ -216,12 +238,12 @@ const ContractsPage = () => {
               showSearch
               optionFilterProp="label"
               placeholder="按项目筛选"
-              style={{ width: 280 }}
+              style={{ width: isMobile ? '100%' : 280 }}
               options={projects.map((item) => ({ label: item.project_name, value: item.id }))}
               onChange={(value) => setProjectFilter(value)}
             />
           </div>
-          <Space>
+          <Space wrap className="action-right">
             <Button
               onClick={() => {
                 const params = new URLSearchParams({ format: 'xlsx' });
@@ -243,7 +265,15 @@ const ContractsPage = () => {
           </Space>
         </div>
 
-        <Table rowKey="id" dataSource={dataSource} columns={columns} loading={loading} scroll={{ x: 1200 }} expandable={expandable} />
+        <Table
+          rowKey="id"
+          dataSource={dataSource}
+          columns={columns}
+          loading={loading}
+          size={isMobile ? 'small' : 'middle'}
+          scroll={{ x: isMobile ? 760 : 1200 }}
+          expandable={expandable}
+        />
       </div>
 
       <Modal
@@ -252,7 +282,7 @@ const ContractsPage = () => {
         onCancel={() => setModalOpen(false)}
         onOk={() => void handleCreate()}
         confirmLoading={submitting}
-        width={720}
+        width={isMobile ? 'calc(100vw - 24px)' : 720}
         destroyOnClose
       >
         <Form layout="vertical" form={form}>

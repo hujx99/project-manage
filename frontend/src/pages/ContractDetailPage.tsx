@@ -2,6 +2,7 @@ import { Alert, Button, Card, Descriptions, Input, InputNumber, Progress, Select
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import useIsMobile from '../hooks/useIsMobile';
 import {
   createContractChange,
   createContractItem,
@@ -30,6 +31,7 @@ function computePendingAmount(plannedAmount?: number | null, actualAmount?: numb
 
 const ContractDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  const isMobile = useIsMobile();
   const contractId = Number(id);
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
@@ -453,15 +455,15 @@ const ContractDetailPage = () => {
   const itemColumns: ColumnsType<ContractItem> = [
     { title: '序号', dataIndex: 'seq', width: 80 },
     { title: '标的名称', dataIndex: 'item_name' },
-    { title: '数量', dataIndex: 'quantity', width: 100 },
-    { title: '单位', dataIndex: 'unit', width: 100, render: (value) => value || '-' },
-    { title: '单价', dataIndex: 'unit_price', width: 120, render: (value) => formatMoney(value) },
+    { title: '数量', dataIndex: 'quantity', width: 100, responsive: ['sm'] },
+    { title: '单位', dataIndex: 'unit', width: 100, responsive: ['lg'], render: (value) => value || '-' },
+    { title: '单价', dataIndex: 'unit_price', width: 120, responsive: ['md'], render: (value) => formatMoney(value) },
     { title: '金额', dataIndex: 'amount', width: 120, render: (value) => formatMoney(value) },
     {
       title: '操作',
       width: 150,
       render: (_, record) => (
-        <Space>
+        <Space wrap direction={isMobile ? 'vertical' : 'horizontal'} className="table-actions">
           <Button type="link" onClick={() => startEditItem(record)}>
             编辑
           </Button>
@@ -478,8 +480,8 @@ const ContractDetailPage = () => {
     { title: '付款阶段', dataIndex: 'phase', width: 140, render: (value) => value || '-' },
     { title: '计划日期', dataIndex: 'planned_date', width: 130, render: (value) => value || '-' },
     { title: '计划金额', dataIndex: 'planned_amount', width: 130, render: (value) => formatMoney(value) },
-    { title: '实际日期', dataIndex: 'actual_date', width: 130, render: (value) => value || '-' },
-    { title: '实际金额', dataIndex: 'actual_amount', width: 130, render: (value) => formatMoney(value) },
+    { title: '实际日期', dataIndex: 'actual_date', width: 130, responsive: ['md'], render: (value) => value || '-' },
+    { title: '实际金额', dataIndex: 'actual_amount', width: 130, responsive: ['lg'], render: (value) => formatMoney(value) },
     { title: '待付款', dataIndex: 'pending_amount', width: 130, render: (value) => formatMoney(value) },
     {
       title: '状态',
@@ -491,7 +493,7 @@ const ContractDetailPage = () => {
       title: '操作',
       width: 220,
       render: (_, record) => (
-        <Space>
+        <Space wrap direction={isMobile ? 'vertical' : 'horizontal'} className="table-actions">
           {record.payment_status !== '已付款' && (
             <Button type="link" loading={saving} onClick={() => void markAsPaid(record)}>
               标记已付款
@@ -511,15 +513,15 @@ const ContractDetailPage = () => {
   const changeColumns: ColumnsType<ContractChange> = [
     { title: '序号', dataIndex: 'seq', width: 80 },
     { title: '变更日期', dataIndex: 'change_date', width: 130 },
-    { title: '变更信息', dataIndex: 'change_info', render: (value) => value || '-' },
-    { title: '变更前内容', dataIndex: 'before_content', render: (value) => value || '-' },
-    { title: '变更后内容', dataIndex: 'after_content', render: (value) => value || '-' },
-    { title: '变更说明', dataIndex: 'change_description', render: (value) => value || '-' },
+    { title: '变更信息', dataIndex: 'change_info', responsive: ['sm'], render: (value) => value || '-' },
+    { title: '变更前内容', dataIndex: 'before_content', responsive: ['lg'], render: (value) => value || '-' },
+    { title: '变更后内容', dataIndex: 'after_content', responsive: ['lg'], render: (value) => value || '-' },
+    { title: '变更说明', dataIndex: 'change_description', responsive: ['md'], render: (value) => value || '-' },
     {
       title: '操作',
       width: 150,
       render: (_, record) => (
-        <Space>
+        <Space wrap direction={isMobile ? 'vertical' : 'horizontal'} className="table-actions">
           <Button type="link" onClick={() => startEditChange(record)}>
             编辑
           </Button>
@@ -542,7 +544,7 @@ const ContractDetailPage = () => {
   return (
     <div className="detail-stack">
       <Card className="page-panel" title={`合同详情：${contract.contract_name}`}>
-        <Descriptions column={3}>
+        <Descriptions className="detail-descriptions" column={{ xs: 1, sm: 1, md: 2, lg: 3 }}>
           <Descriptions.Item label="合同编号">{contract.contract_code}</Descriptions.Item>
           <Descriptions.Item label="供应商">{contract.vendor || '-'}</Descriptions.Item>
           <Descriptions.Item label="状态">
@@ -581,7 +583,7 @@ const ContractDetailPage = () => {
       <Card className="page-panel" title="付款进度">
         <Space direction="vertical" style={{ width: '100%' }}>
           <Progress percent={progressPercent} strokeColor="#0f766e" />
-          <Space size="large">
+          <Space wrap size="large" className="summary-inline">
             <Typography.Text>计划合计：{formatMoney(plannedTotal)}</Typography.Text>
             <Typography.Text>已付合计：{formatMoney(paidTotal)}</Typography.Text>
             <Typography.Text>待付合计：{formatMoney(pendingTotal)}</Typography.Text>
@@ -599,12 +601,21 @@ const ContractDetailPage = () => {
                 <>
                   <div className="action-bar">
                     <div className="action-left" />
-                    <Button type="primary" onClick={startCreateItem}>
-                      新增行
-                    </Button>
+                    <Space wrap className="action-right">
+                      <Button type="primary" onClick={startCreateItem}>
+                        新增行
+                      </Button>
+                    </Space>
                   </div>
                   {renderItemEditor()}
-                  <Table rowKey="id" dataSource={contract.items} columns={itemColumns} pagination={false} />
+                  <Table
+                    rowKey="id"
+                    dataSource={contract.items}
+                    columns={itemColumns}
+                    pagination={false}
+                    size={isMobile ? 'small' : 'middle'}
+                    scroll={{ x: isMobile ? 720 : 980 }}
+                  />
                 </>
               ),
             },
@@ -615,12 +626,21 @@ const ContractDetailPage = () => {
                 <>
                   <div className="action-bar">
                     <div className="action-left" />
-                    <Button type="primary" onClick={startCreatePayment}>
-                      新增行
-                    </Button>
+                    <Space wrap className="action-right">
+                      <Button type="primary" onClick={startCreatePayment}>
+                        新增行
+                      </Button>
+                    </Space>
                   </div>
                   {renderPaymentEditor()}
-                  <Table rowKey="id" dataSource={contract.payments} columns={paymentColumns} pagination={false} />
+                  <Table
+                    rowKey="id"
+                    dataSource={contract.payments}
+                    columns={paymentColumns}
+                    pagination={false}
+                    size={isMobile ? 'small' : 'middle'}
+                    scroll={{ x: isMobile ? 860 : 1180 }}
+                  />
                 </>
               ),
             },
@@ -631,12 +651,21 @@ const ContractDetailPage = () => {
                 <>
                   <div className="action-bar">
                     <div className="action-left" />
-                    <Button type="primary" onClick={startCreateChange}>
-                      新增行
-                    </Button>
+                    <Space wrap className="action-right">
+                      <Button type="primary" onClick={startCreateChange}>
+                        新增行
+                      </Button>
+                    </Space>
                   </div>
                   {renderChangeEditor()}
-                  <Table rowKey="id" dataSource={contract.changes} columns={changeColumns} pagination={false} />
+                  <Table
+                    rowKey="id"
+                    dataSource={contract.changes}
+                    columns={changeColumns}
+                    pagination={false}
+                    size={isMobile ? 'small' : 'middle'}
+                    scroll={{ x: isMobile ? 760 : 1100 }}
+                  />
                 </>
               ),
             },

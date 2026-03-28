@@ -23,6 +23,7 @@ import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../api/client';
+import useIsMobile from '../hooks/useIsMobile';
 import { createProject, deleteProject, fetchProjects, updateProject } from '../services/projects';
 import type { Project } from '../types';
 
@@ -190,6 +191,7 @@ function writeProjectListSettings(settings: ProjectListSettings) {
 
 const ProjectsPage = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [projects, setProjects] = useState<Project[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -337,6 +339,7 @@ const ProjectsPage = () => {
         dataIndex: 'project_code',
         key: 'project_code',
         width: 180,
+        responsive: ['md'],
         sorter: true,
         sortOrder: settings.sortField === 'project_code' ? settings.sortOrder : undefined,
       },
@@ -349,9 +352,17 @@ const ProjectsPage = () => {
         sorter: true,
         sortOrder: settings.sortField === 'project_name' ? settings.sortOrder : undefined,
         render: (_value: unknown, record: Project) => (
-          <Link to={`/projects/${record.id}`} className="table-link-ellipsis" title={record.project_name}>
-            {record.project_name}
-          </Link>
+          <div className="table-cell-stack">
+            <Link to={`/projects/${record.id}`} className="table-link-ellipsis table-cell-title" title={record.project_name}>
+              {record.project_name}
+            </Link>
+            {isMobile && (
+              <>
+                <span className="table-cell-subtitle">{record.project_code}</span>
+                <span className="table-cell-meta">{record.manager || '未设置负责人'}</span>
+              </>
+            )}
+          </div>
         ),
       },
       {
@@ -359,6 +370,7 @@ const ProjectsPage = () => {
         dataIndex: 'start_date',
         key: 'start_date',
         width: 120,
+        responsive: ['lg'],
         sorter: true,
         sortOrder: settings.sortField === 'start_date' ? settings.sortOrder : undefined,
         render: (value: string | null) => value || '-',
@@ -377,6 +389,7 @@ const ProjectsPage = () => {
         dataIndex: 'budget',
         key: 'budget',
         width: 140,
+        responsive: ['sm'],
         sorter: true,
         sortOrder: settings.sortField === 'budget' ? settings.sortOrder : undefined,
         render: (value: number | null) => (value != null ? `\u00a5${Number(value).toLocaleString()}` : '-'),
@@ -386,6 +399,7 @@ const ProjectsPage = () => {
         dataIndex: 'manager',
         key: 'manager',
         width: 100,
+        responsive: ['xl'],
         sorter: true,
         sortOrder: settings.sortField === 'manager' ? settings.sortOrder : undefined,
         render: (value: string | null) => value || '-',
@@ -395,6 +409,7 @@ const ProjectsPage = () => {
         dataIndex: 'remark',
         key: 'remark',
         width: 180,
+        responsive: ['xl'],
         ellipsis: true,
         render: (value: string | null) => value || '-',
       },
@@ -402,6 +417,7 @@ const ProjectsPage = () => {
         title: T.colContracts,
         key: 'contracts',
         width: 120,
+        responsive: ['md'],
         render: (_value: unknown, record: Project) => (
           <Link to={`/projects/${record.id}`}>
             {record.contract_count != null ? `${record.contract_count} \u4e2a\u5408\u540c` : '\u67e5\u770b'}
@@ -409,7 +425,7 @@ const ProjectsPage = () => {
         ),
       },
     ],
-    [settings.sortField, settings.sortOrder],
+    [isMobile, settings.sortField, settings.sortOrder],
   );
 
   const visibleColumns = allColumns.filter((column) => settings.visibleColumns.includes(column.key));
@@ -419,9 +435,9 @@ const ProjectsPage = () => {
       title: T.colActions,
       key: 'actions',
       width: 150,
-      fixed: 'right',
+      fixed: isMobile ? undefined : 'right',
       render: (_value: unknown, record: Project) => (
-        <Space>
+        <Space wrap direction={isMobile ? 'vertical' : 'horizontal'} className="table-actions">
           <Button type="link" onClick={() => openEditModal(record)}>
             {T.editButton}
           </Button>
@@ -456,13 +472,13 @@ const ProjectsPage = () => {
         </Typography.Text>
       </div>
 
-      <div className="page-panel" style={{ padding: 20 }}>
+      <div className="page-panel" style={{ padding: isMobile ? 16 : 20 }}>
         <div className="action-bar">
           <div className="action-left">
             <Input.Search
               placeholder={T.searchPlaceholder}
               allowClear
-              style={{ width: 260 }}
+              style={{ width: isMobile ? '100%' : 260 }}
               onSearch={(value) => {
                 setSearch(value.trim());
                 setPage(1);
@@ -471,7 +487,7 @@ const ProjectsPage = () => {
             <Select
               placeholder={T.statusPlaceholder}
               allowClear
-              style={{ width: 180 }}
+              style={{ width: isMobile ? '100%' : 180 }}
               options={PROJECT_STATUSES.map((item) => ({ label: item, value: item }))}
               onChange={(value) => {
                 setStatus(value);
@@ -479,7 +495,7 @@ const ProjectsPage = () => {
               }}
             />
           </div>
-          <Space>
+          <Space wrap className="action-right">
             <Tooltip title={viewMode === 'table' ? '\u770b\u677f\u89c6\u56fe' : '\u5217\u8868\u89c6\u56fe'}>
               <Button
                 icon={viewMode === 'table' ? <AppstoreOutlined /> : <BarsOutlined />}
@@ -571,7 +587,8 @@ const ProjectsPage = () => {
             columns={columns}
             dataSource={projects}
             loading={loading}
-            scroll={{ x: 1200 }}
+            size={isMobile ? 'small' : 'middle'}
+            scroll={{ x: isMobile ? 720 : 1200 }}
             onChange={handleTableChange}
             pagination={{
               current: page,
@@ -591,10 +608,10 @@ const ProjectsPage = () => {
       <Drawer
         title={T.settingsTitle}
         open={settingsOpen}
-        width={420}
+        width={isMobile ? '100%' : 420}
         onClose={() => setSettingsOpen(false)}
         extra={
-          <Space>
+          <Space wrap className="card-extra-actions">
             <Button onClick={() => setDraftSettings(DEFAULT_PROJECT_LIST_SETTINGS)}>{T.resetButton}</Button>
             <Button
               type="primary"
@@ -692,6 +709,7 @@ const ProjectsPage = () => {
         }}
         onOk={() => void handleSubmit()}
         confirmLoading={submitting}
+        width={isMobile ? 'calc(100vw - 24px)' : undefined}
         destroyOnClose
       >
         <Form layout="vertical" form={form}>

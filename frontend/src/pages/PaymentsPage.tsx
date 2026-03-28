@@ -3,6 +3,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../api/client';
+import useIsMobile from '../hooks/useIsMobile';
 import { createPayment, deletePayment, fetchPayments, updatePayment } from '../services/payments';
 import { fetchContracts } from '../services/contracts';
 import { fetchProjects } from '../services/projects';
@@ -29,6 +30,7 @@ function compareDate(a?: string | null, b?: string | null) {
 }
 
 const PaymentsPage = () => {
+  const isMobile = useIsMobile();
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -136,6 +138,7 @@ const PaymentsPage = () => {
       title: '项目编号',
       dataIndex: 'project_code',
       width: 160,
+      responsive: ['xl'],
       sorter: (a, b) => compareText(a.project_code, b.project_code),
     },
     {
@@ -144,11 +147,23 @@ const PaymentsPage = () => {
       width: 200,
       ellipsis: true,
       sorter: (a, b) => compareText(a.project_name, b.project_name),
+      render: (value: string, record) => (
+        <div className="table-cell-stack">
+          <span className="table-cell-title">{value}</span>
+          {isMobile && (
+            <>
+              <span className="table-cell-subtitle">{record.contract_name}</span>
+              <span className="table-cell-meta">{record.project_code}</span>
+            </>
+          )}
+        </div>
+      ),
     },
     {
       title: '合同名称',
       dataIndex: 'contract_name',
       width: 200,
+      responsive: ['md'],
       ellipsis: true,
       sorter: (a, b) => compareText(a.contract_name, b.contract_name),
     },
@@ -156,6 +171,7 @@ const PaymentsPage = () => {
       title: '所属阶段',
       dataIndex: 'phase',
       width: 120,
+      responsive: ['sm'],
       sorter: (a, b) => compareText(a.phase, b.phase),
       render: (value) => value || '-',
     },
@@ -177,6 +193,7 @@ const PaymentsPage = () => {
       title: '流程已提金额',
       dataIndex: 'actual_amount',
       width: 140,
+      responsive: ['lg'],
       sorter: (a, b) => compareNumber(a.actual_amount, b.actual_amount),
       render: (value) => `¥${Number(value ?? 0).toLocaleString()}`,
     },
@@ -200,15 +217,16 @@ const PaymentsPage = () => {
       title: '备注',
       dataIndex: 'remark',
       width: 160,
+      responsive: ['xl'],
       ellipsis: true,
       render: (value) => value || '-',
     },
     {
       title: '操作',
       width: 160,
-      fixed: 'right',
+      fixed: isMobile ? undefined : 'right',
       render: (_, record) => (
-        <Space>
+        <Space wrap direction={isMobile ? 'vertical' : 'horizontal'} className="table-actions">
           {record.payment_status !== '已付款' && (
             <Button type="link" onClick={() => void handleMarkPaid(record)}>
               标记已付款
@@ -233,10 +251,10 @@ const PaymentsPage = () => {
         </Typography.Text>
       </div>
 
-      <div className="page-panel" style={{ padding: 20 }}>
+      <div className="page-panel" style={{ padding: isMobile ? 16 : 20 }}>
         <div className="action-bar">
           <div className="action-left" />
-          <Space>
+          <Space wrap className="action-right">
             <Button onClick={() => window.open(`${API_BASE_URL}/export/payments?format=xlsx`, '_blank')}>
               导出
             </Button>
@@ -252,7 +270,14 @@ const PaymentsPage = () => {
           </Space>
         </div>
 
-        <Table rowKey="id" dataSource={payments} columns={columns} loading={loading} scroll={{ x: 1600 }} />
+        <Table
+          rowKey="id"
+          dataSource={payments}
+          columns={columns}
+          loading={loading}
+          size={isMobile ? 'small' : 'middle'}
+          scroll={{ x: isMobile ? 860 : 1600 }}
+        />
       </div>
 
       <Modal
@@ -261,6 +286,7 @@ const PaymentsPage = () => {
         onCancel={() => setModalOpen(false)}
         onOk={() => void handleCreate()}
         confirmLoading={submitting}
+        width={isMobile ? 'calc(100vw - 24px)' : undefined}
         destroyOnClose
       >
         <Form layout="vertical" form={form}>

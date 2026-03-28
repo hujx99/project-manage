@@ -2,6 +2,7 @@ import { Alert, Card, Skeleton, Statistic, Table, Tag, Typography, message } fro
 import type { ColumnsType } from 'antd/es/table';
 import { Pie } from '@ant-design/charts';
 import { useEffect, useMemo, useState } from 'react';
+import useIsMobile from '../hooks/useIsMobile';
 import { fetchDashboardSummary, fetchPendingPayments, type DashboardSummary, type PendingPayment } from '../services/dashboard';
 
 function formatMoney(value: number) {
@@ -9,6 +10,7 @@ function formatMoney(value: number) {
 }
 
 const Dashboard = () => {
+  const isMobile = useIsMobile();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,8 +50,17 @@ const Dashboard = () => {
   }, [pendingPayments]);
 
   const columns: ColumnsType<PendingPayment> = [
-    { title: '项目名称', dataIndex: 'project_name' },
-    { title: '合同名称', dataIndex: 'contract_name' },
+    {
+      title: '项目名称',
+      dataIndex: 'project_name',
+      render: (value: string, record) => (
+        <div className="table-cell-stack">
+          <span className="table-cell-title">{value}</span>
+          {isMobile && <span className="table-cell-subtitle">{record.contract_name || '-'}</span>}
+        </div>
+      ),
+    },
+    { title: '合同名称', dataIndex: 'contract_name', responsive: ['md'] },
     {
       title: '金额',
       dataIndex: 'amount',
@@ -70,6 +81,7 @@ const Dashboard = () => {
       title: '状态',
       dataIndex: 'payment_status',
       width: 120,
+      responsive: ['sm'],
       render: (value: string) => <Tag color={value === '已提交' ? 'processing' : 'warning'}>{value}</Tag>,
     },
   ];
@@ -128,7 +140,7 @@ const Dashboard = () => {
                 style: { fontSize: 12 },
               },
             ]}
-            height={320}
+            height={isMobile ? 260 : 320}
           />
         )}
       </Card>
@@ -147,7 +159,9 @@ const Dashboard = () => {
           columns={columns}
           dataSource={pendingPayments}
           loading={loading}
+          size={isMobile ? 'small' : 'middle'}
           pagination={{ pageSize: 10 }}
+          scroll={{ x: 640 }}
           locale={{ emptyText: '未来 30 天内暂无待付款记录' }}
         />
       </Card>
