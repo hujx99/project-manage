@@ -73,13 +73,21 @@ npm run dev -- --host 0.0.0.0 --port 5173
 
 ## AI 截图识别配置
 
-在项目根目录 `.env` 中配置：
+先复制 `.env.example` 为 `.env`，再按需配置：
 
 ```env
 ANTHROPIC_API_KEY=你的_Anthropic_API_Key
+SQLITE_DB_PATH=.local/project-manage.db
 ```
 
 如果未配置，AI 截图识别接口会直接返回中文错误提示。
+
+其中：
+
+- `ANTHROPIC_API_KEY`：AI 截图识别使用
+- `SQLITE_DB_PATH`：本地 SQLite 文件位置
+
+默认建议把 SQLite 放在 `.local/` 这类被 Git 忽略的目录，不要把真实业务数据放进版本库。
 
 ## API 文档地址
 
