@@ -15,15 +15,15 @@ import useIsMobile from '../hooks/useIsMobile';
 const { Header, Sider, Content } = Layout;
 
 const TEXT = {
-  dashboard: '\u4eea\u8868\u76d8',
-  projects: '\u9879\u76ee\u7ba1\u7406',
-  contracts: '\u5408\u540c\u7ba1\u7406',
-  payments: '\u4ed8\u6b3e\u7ba1\u7406',
-  imports: '\u6570\u636e\u5bfc\u5165',
-  brandTitle: '\u9879\u76ee\u5408\u540c\u7ba1\u7406',
-  brandSubtitle: '\u672c\u5730\u4e1a\u52a1\u53f0\u8d26',
-  headerTitle: '\u9879\u76ee / \u5408\u540c / \u4ed8\u6b3e\u7ba1\u7406',
-  headerSubtitle: '\u9762\u5411\u672c\u5730\u4e1a\u52a1\u5f55\u5165\u4e0e\u8ddf\u8e2a',
+  dashboard: '\u4e1a\u52a1\u603b\u89c8',
+  projects: '\u9879\u76ee\u7acb\u9879',
+  contracts: '\u5408\u540c\u6267\u884c',
+  payments: '\u4ed8\u6b3e\u8ddf\u8e2a',
+  imports: '\u6279\u91cf\u5bfc\u5165',
+  brandTitle: '\u9879\u76ee\u4e1a\u52a1\u53f0\u8d26',
+  brandSubtitle: '\u6309\u6d41\u7a0b\u7ba1\u9879\u76ee\u3001\u5408\u540c\u548c\u4ed8\u6b3e',
+  headerTitle: '\u9879\u76ee\u7acb\u9879 / \u5408\u540c\u6267\u884c / \u4ed8\u6b3e\u8ddf\u8e2a',
+  headerSubtitle: '\u5148\u5efa\u9879\u76ee\u53f0\u8d26\uff0c\u518d\u843d\u5408\u540c\uff0c\u6700\u540e\u76ef\u4ed8\u6b3e\u6267\u884c',
 };
 
 const menuItems = [
@@ -73,8 +73,8 @@ const MainLayout = () => {
           trigger={null}
           collapsed={collapsed}
           width={240}
-          collapsedWidth={76}
-          className="shell-sider"
+          collapsedWidth={88}
+          className={`shell-sider ${collapsed ? 'is-collapsed' : ''}`}
         >
           <div className={`shell-brand ${collapsed ? 'is-collapsed' : ''}`}>
             <div className="shell-brand-badge">PM</div>
@@ -92,7 +92,7 @@ const MainLayout = () => {
         </Sider>
       )}
 
-      <Layout>
+      <Layout className="shell-main">
         <Header className="shell-header">
           <div className="shell-header-inner">
             <Button

@@ -2,6 +2,12 @@ import { Alert, Button, Card, Descriptions, Input, InputNumber, Progress, Select
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import {
+  CONTRACT_STATUS_COLORS,
+  PAYMENT_STATUSES,
+  getPaymentStatusColor,
+  normalizePaymentStatus,
+} from '../constants/business';
 import useIsMobile from '../hooks/useIsMobile';
 import {
   createContractChange,
@@ -14,8 +20,6 @@ import {
 } from '../services/contracts';
 import { createPayment, deletePayment, updatePayment } from '../services/payments';
 import type { Contract, ContractChange, ContractItem, Payment } from '../types';
-
-const PAYMENT_STATUSES = ['未付', '已提交', '已付款'];
 
 type EditableItemDraft = Partial<ContractItem> & Pick<ContractItem, 'seq' | 'item_name' | 'quantity' | 'amount'>;
 type EditablePaymentDraft = Partial<Payment> & Pick<Payment, 'payment_status'>;
@@ -185,7 +189,7 @@ const ContractDetailPage = () => {
   const startEditPayment = (record: Payment) => {
     resetPaymentEditor();
     setEditingPaymentId(record.id);
-    setPaymentDraft({ ...record });
+    setPaymentDraft({ ...record, payment_status: normalizePaymentStatus(record.payment_status) });
   };
 
   const markAsPaid = async (record: Payment) => {
@@ -487,7 +491,7 @@ const ContractDetailPage = () => {
       title: '状态',
       dataIndex: 'payment_status',
       width: 110,
-      render: (value: string) => <Tag color={value === '已付款' ? 'success' : value === '已提交' ? 'processing' : 'default'}>{value}</Tag>,
+      render: (value: string) => <Tag color={getPaymentStatusColor(value)}>{normalizePaymentStatus(value)}</Tag>,
     },
     {
       title: '操作',
@@ -548,7 +552,7 @@ const ContractDetailPage = () => {
           <Descriptions.Item label="合同编号">{contract.contract_code}</Descriptions.Item>
           <Descriptions.Item label="供应商">{contract.vendor || '-'}</Descriptions.Item>
           <Descriptions.Item label="状态">
-            <Tag color={contract.status === '归档' ? 'success' : 'processing'}>{contract.status}</Tag>
+            <Tag color={CONTRACT_STATUS_COLORS[contract.status] ?? 'processing'}>{contract.status}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="所属项目 ID">{contract.project_id}</Descriptions.Item>
           <Descriptions.Item label="合同金额">{formatMoney(contract.amount)}</Descriptions.Item>

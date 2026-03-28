@@ -1,9 +1,14 @@
 import axios from 'axios';
 
+const host = window.location.hostname;
+const port = window.location.port;
+const protocol = window.location.protocol;
+const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+const isLocalPreviewPort = port === '4173' || port === '5173';
+const shouldUseDirectApi = isLocalHost || isLocalPreviewPort;
+
 export const API_BASE_URL =
-  window.location.hostname === 'localhost' && window.location.port === '5173'
-    ? 'http://localhost:8000/api'
-    : '/api';
+  import.meta.env.VITE_API_BASE_URL || (shouldUseDirectApi ? `${protocol}//${host}:8000/api` : '/api');
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -11,7 +16,14 @@ const client = axios.create({
 });
 
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const contentType = String(response.headers?.['content-type'] || '');
+    if (typeof response.data === 'string' && contentType.includes('text/html')) {
+      return Promise.reject(new Error('接口地址配置错误，或本地后端服务尚未启动'));
+    }
+
+    return response;
+  },
   (error) => {
     const message =
       error?.response?.data?.message ||

@@ -3,6 +3,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../api/client';
+import { PAYMENT_STATUSES, getPaymentStatusColor, normalizePaymentStatus } from '../constants/business';
 import useIsMobile from '../hooks/useIsMobile';
 import { createPayment, deletePayment, fetchPayments, updatePayment } from '../services/payments';
 import { fetchContracts } from '../services/contracts';
@@ -14,8 +15,6 @@ interface PaymentRow extends Payment {
   project_name: string;
   contract_name: string;
 }
-
-const PAYMENT_STATUSES = ['未付', '已提报', '已付款'];
 
 function compareText(a?: string | null, b?: string | null) {
   return (a ?? '').localeCompare(b ?? '', 'zh-CN');
@@ -210,7 +209,7 @@ const PaymentsPage = () => {
       width: 110,
       sorter: (a, b) => compareText(a.payment_status, b.payment_status),
       render: (value: string) => (
-        <Tag color={value === '已付款' ? 'success' : value === '已提报' ? 'processing' : 'default'}>{value}</Tag>
+        <Tag color={getPaymentStatusColor(value)}>{normalizePaymentStatus(value)}</Tag>
       ),
     },
     {
@@ -244,10 +243,10 @@ const PaymentsPage = () => {
     <div className="detail-stack">
       <div>
         <Typography.Title level={3} style={{ marginBottom: 4 }}>
-          付款管理
+          付款跟踪
         </Typography.Title>
         <Typography.Text type="secondary">
-          统一查看所有付款记录，表格列支持排序，新建时可先选项目再联动筛选合同。
+          第三步：统一跟踪合同付款执行，集中处理未付、提报和已付款项。
         </Typography.Text>
       </div>
 

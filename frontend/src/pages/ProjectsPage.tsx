@@ -23,21 +23,18 @@ import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../api/client';
+import { PROJECT_STATUSES, PROJECT_STATUS_COLORS } from '../constants/business';
 import useIsMobile from '../hooks/useIsMobile';
-import { createProject, deleteProject, fetchProjects, updateProject } from '../services/projects';
+import { createProject, deleteProject, fetchAllProjects, fetchProjects, updateProject } from '../services/projects';
 import type { Project } from '../types';
 
 const T = {
-  pageTitle: '\u9879\u76ee\u7ba1\u7406',
+  pageTitle: '\u9879\u76ee\u7acb\u9879',
   pageDesc:
-    '\u53ef\u7ba1\u7406\u5217\u8868\u663e\u793a\u5217\u3001\u9ed8\u8ba4\u6392\u5e8f\u548c\u9690\u85cf\u72b6\u6001\u3002',
+    '\u7b2c\u4e00\u6b65\uff1a\u5efa\u7acb\u9879\u76ee\u53f0\u8d26\uff0c\u660e\u786e\u9884\u7b97\u3001\u8d1f\u8d23\u4eba\u548c\u5f53\u524d\u9636\u6bb5\uff0c\u5408\u540c\u548c\u4ed8\u6b3e\u90fd\u4ece\u8fd9\u91cc\u5f00\u59cb\u3002',
   typeDev: '\u7814\u53d1\u9879\u76ee',
   typeEngineering: '\u5de5\u7a0b\u9879\u76ee',
   typeService: '\u670d\u52a1\u9879\u76ee',
-  statusInit: '\u7acb\u9879',
-  statusRunning: '\u6267\u884c\u4e2d',
-  statusAccept: '\u9a8c\u6536',
-  statusClosed: '\u7ed3\u9879',
   colCode: '\u9879\u76ee\u7f16\u53f7',
   colName: '\u9879\u76ee\u540d\u79f0',
   colStartDate: '\u7acb\u9879\u65e5\u671f',
@@ -50,7 +47,7 @@ const T = {
   colUpdatedAt: '\u66f4\u65b0\u65f6\u95f4',
   colActions: '\u64cd\u4f5c',
   searchPlaceholder: '\u641c\u7d22\u9879\u76ee\u7f16\u53f7\u6216\u9879\u76ee\u540d\u79f0',
-  statusPlaceholder: '\u6309\u72b6\u6001\u7b5b\u9009',
+  statusPlaceholder: '\u6309\u9636\u6bb5\u7b5b\u9009',
   settingsButton: '\u663e\u793a\u8bbe\u7f6e',
   exportButton: '\u5bfc\u51fa',
   createButton: '\u65b0\u5efa\u9879\u76ee',
@@ -61,10 +58,10 @@ const T = {
   saveButton: '\u4fdd\u5b58',
   sectionColumns: '\u663e\u793a\u5217',
   sectionSort: '\u9ed8\u8ba4\u6392\u5e8f',
-  sectionHiddenStatus: '\u9690\u85cf\u72b6\u6001',
+  sectionHiddenStatus: '\u9690\u85cf\u9636\u6bb5',
   sortAsc: '\u5347\u5e8f',
   sortDesc: '\u964d\u5e8f',
-  hiddenStatusPlaceholder: '\u9009\u62e9\u4e0d\u663e\u793a\u7684\u72b6\u6001',
+  hiddenStatusPlaceholder: '\u9009\u62e9\u4e0d\u663e\u793a\u7684\u9636\u6bb5',
   editTitle: '\u7f16\u8f91\u9879\u76ee',
   createTitle: '\u65b0\u5efa\u9879\u76ee',
   formCode: '\u9879\u76ee\u7f16\u53f7',
@@ -92,7 +89,6 @@ const T = {
 };
 
 const PROJECT_TYPES = [T.typeDev, T.typeEngineering, T.typeService];
-const PROJECT_STATUSES = [T.statusInit, T.statusRunning, T.statusAccept, T.statusClosed];
 const PROJECT_LIST_SETTINGS_KEY = 'project-list-settings-v1';
 
 type ProjectColumnKey =
@@ -118,7 +114,7 @@ const DEFAULT_PROJECT_LIST_SETTINGS: ProjectListSettings = {
   visibleColumns: ['project_code', 'project_name', 'start_date', 'status', 'budget', 'manager', 'remark', 'contracts'],
   sortField: 'start_date',
   sortOrder: 'descend',
-  hiddenStatuses: [T.statusClosed],
+  hiddenStatuses: ['结项'],
 };
 
 const COLUMN_OPTIONS: Array<{ label: string; value: ProjectColumnKey }> = [
@@ -142,13 +138,6 @@ const SORT_OPTIONS: Array<{ label: string; value: ProjectSortField }> = [
   { label: T.colCreatedAt, value: 'created_at' },
   { label: T.colUpdatedAt, value: 'updated_at' },
 ];
-
-const statusColorMap: Record<string, string> = {
-  [T.statusInit]: 'default',
-  [T.statusRunning]: 'processing',
-  [T.statusAccept]: 'warning',
-  [T.statusClosed]: 'success',
-};
 
 function readProjectListSettings(): ProjectListSettings {
   if (typeof window === 'undefined') {
@@ -234,8 +223,8 @@ const ProjectsPage = () => {
   const loadKanbanProjects = async () => {
     setKanbanLoading(true);
     try {
-      const result = await fetchProjects({ page: 1, page_size: 1000, search: search || undefined });
-      setKanbanProjects(result.items);
+      const result = await fetchAllProjects({ search: search || undefined });
+      setKanbanProjects(result);
     } catch (error) {
       message.error((error as Error).message);
     } finally {
@@ -382,7 +371,7 @@ const ProjectsPage = () => {
         width: 110,
         sorter: true,
         sortOrder: settings.sortField === 'status' ? settings.sortOrder : undefined,
-        render: (value: string) => <Tag color={statusColorMap[value] ?? 'default'}>{value}</Tag>,
+        render: (value: string) => <Tag color={PROJECT_STATUS_COLORS[value] ?? 'default'}>{value}</Tag>,
       },
       {
         title: T.colBudget,

@@ -4,20 +4,16 @@ import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../api/client';
+import {
+  CONTRACT_STATUSES,
+  CONTRACT_STATUS_COLORS,
+  getPaymentStatusColor,
+  normalizePaymentStatus,
+} from '../constants/business';
 import useIsMobile from '../hooks/useIsMobile';
 import { createContract, fetchContracts } from '../services/contracts';
 import { fetchProjects } from '../services/projects';
 import type { Contract, Payment, Project } from '../types';
-
-const CONTRACT_STATUSES = ['草拟', '签订', '服务中', '执行中', '归档'];
-
-const statusColorMap: Record<string, string> = {
-  草拟: 'default',
-  签订: 'processing',
-  服务中: 'cyan',
-  执行中: 'warning',
-  归档: 'success',
-};
 
 function compareText(a?: string | null, b?: string | null) {
   return (a ?? '').localeCompare(b ?? '', 'zh-CN');
@@ -119,7 +115,7 @@ const ContractsPage = () => {
       dataIndex: 'payment_status',
       width: 100,
       render: (v: string) => (
-        <Tag color={v === '已付款' ? 'success' : v === '已提报' ? 'processing' : 'default'}>{v}</Tag>
+        <Tag color={getPaymentStatusColor(v)}>{normalizePaymentStatus(v)}</Tag>
       ),
     },
     { title: '备注', dataIndex: 'remark', ellipsis: true, responsive: ['lg'], render: (v) => v || '-' },
@@ -183,7 +179,7 @@ const ContractsPage = () => {
       dataIndex: 'status',
       width: 110,
       sorter: (a, b) => compareText(a.status, b.status),
-      render: (value: string) => <Tag color={statusColorMap[value] ?? 'default'}>{value}</Tag>,
+      render: (value: string) => <Tag color={CONTRACT_STATUS_COLORS[value] ?? 'default'}>{value}</Tag>,
     },
     {
       title: '签订时间',
@@ -223,10 +219,10 @@ const ContractsPage = () => {
     <div className="detail-stack">
       <div>
         <Typography.Title level={3} style={{ marginBottom: 4 }}>
-          合同管理
+          合同执行
         </Typography.Title>
         <Typography.Text type="secondary">
-          支持按项目筛选合同，表格列可排序，点击合同可进入详情页维护标的、付款和变更。
+          第二步：在项目下落合同，统一维护金额、供应商、标的清单、变更记录和付款计划。
         </Typography.Text>
       </div>
 

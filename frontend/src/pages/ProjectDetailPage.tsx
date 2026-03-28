@@ -3,9 +3,10 @@ import type { ColumnsType, TableProps } from 'antd/es/table';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { getPaymentStatusColor, normalizePaymentStatus, PROJECT_STATUS_COLORS } from '../constants/business';
 import useIsMobile from '../hooks/useIsMobile';
 import { fetchContracts } from '../services/contracts';
-import { fetchProject, fetchProjects } from '../services/projects';
+import { fetchAllProjects, fetchProject } from '../services/projects';
 import type { Contract, Payment, Project } from '../types';
 
 function compareText(a?: string | null, b?: string | null) {
@@ -35,11 +36,11 @@ const ProjectDetailPage = () => {
         const [projectDetail, contractList, allProjects] = await Promise.all([
           fetchProject(Number(id)),
           fetchContracts(),
-          fetchProjects({ page: 1, page_size: 1000, sort_field: 'start_date', sort_order: 'desc' }),
+          fetchAllProjects({ sort_field: 'start_date', sort_order: 'desc' }),
         ]);
         setProject(projectDetail);
         setContracts(contractList.filter((item) => item.project_id === Number(id)));
-        const ids = allProjects.items.map((p) => p.id);
+        const ids = allProjects.map((p) => p.id);
         const idx = ids.indexOf(Number(id));
         setPrevId(idx > 0 ? ids[idx - 1] : null);
         setNextId(idx < ids.length - 1 ? ids[idx + 1] : null);
@@ -93,9 +94,7 @@ const ProjectDetailPage = () => {
       title: '付款状态',
       dataIndex: 'payment_status',
       width: 100,
-      render: (v: string) => (
-        <Tag color={v === '已付款' ? 'success' : v === '已提报' ? 'processing' : 'default'}>{v}</Tag>
-      ),
+      render: (v: string) => <Tag color={getPaymentStatusColor(v)}>{normalizePaymentStatus(v)}</Tag>,
     },
     { title: '备注', dataIndex: 'remark', ellipsis: true, responsive: ['lg'], render: (v) => v || '-' },
   ];
@@ -204,7 +203,7 @@ const ProjectDetailPage = () => {
           <Descriptions.Item label="项目编号">{project.project_code}</Descriptions.Item>
           <Descriptions.Item label="项目属性">{project.project_type || '-'}</Descriptions.Item>
           <Descriptions.Item label="项目状态">
-            <Tag>{project.status}</Tag>
+            <Tag color={PROJECT_STATUS_COLORS[project.status] ?? 'default'}>{project.status}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="项目金额">
             {project.budget != null ? `¥${Number(project.budget).toLocaleString()}` : '-'}
