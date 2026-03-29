@@ -563,10 +563,10 @@ const ContractDetailPage = () => {
           <Descriptions.Item label="备案日期">{contract.filing_date || '-'}</Descriptions.Item>
           <Descriptions.Item label="开始执行日期">{contract.start_date || '-'}</Descriptions.Item>
           <Descriptions.Item label="结束执行日期">{contract.end_date || '-'}</Descriptions.Item>
-          <Descriptions.Item label="备案文件" span={2}>
+          <Descriptions.Item label="备案文件" span={{ xs: 1, sm: 1, md: 2, lg: 3 }}>
             {contract.filing_reference || '-'}
           </Descriptions.Item>
-          <Descriptions.Item label="备注" span={3}>
+          <Descriptions.Item label="备注" span={{ xs: 1, sm: 1, md: 2, lg: 3 }}>
             {contract.remark || '-'}
           </Descriptions.Item>
         </Descriptions>

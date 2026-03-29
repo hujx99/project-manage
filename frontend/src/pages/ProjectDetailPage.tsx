@@ -211,8 +211,10 @@ const ProjectDetailPage = () => {
           <Descriptions.Item label="负责人">{project.manager || '-'}</Descriptions.Item>
           <Descriptions.Item label="立项时间">{project.start_date || '-'}</Descriptions.Item>
           <Descriptions.Item label="创建时间">{project.created_at ? project.created_at.slice(0, 10) : '-'}</Descriptions.Item>
-          <Descriptions.Item label="更新时间">{project.updated_at ? project.updated_at.slice(0, 10) : '-'}</Descriptions.Item>
-          <Descriptions.Item label="备注" span={3}>
+          <Descriptions.Item label="更新时间" span={{ xs: 1, sm: 1, md: 1, lg: 2 }}>
+            {project.updated_at ? project.updated_at.slice(0, 10) : '-'}
+          </Descriptions.Item>
+          <Descriptions.Item label="备注" span={{ xs: 1, sm: 1, md: 2, lg: 3 }}>
             {project.remark || '-'}
           </Descriptions.Item>
         </Descriptions>
