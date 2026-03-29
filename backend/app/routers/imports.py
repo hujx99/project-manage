@@ -1,4 +1,16 @@
-"""AI 截图识别导入路由。"""
+"""导入相关路由。
+
+这里实际上维护两条导入链路：
+
+1. Excel 导入
+   - 下载模板
+   - 上传项目/合同/付款三类 Excel
+   - 按行做校验并落库
+2. 截图识别导入
+   - 上传多张 OA / 合同截图给 AI 识别
+   - 前端人工确认识别结果
+   - 再由确认接口统一写入数据库
+"""
 
 from __future__ import annotations
 
@@ -19,6 +31,8 @@ from ..services.ai_parser import AIParserError, parse_screenshots
 
 router = APIRouter(prefix="/api/import", tags=["导入"])
 
+# Excel 模板、表头映射、示例行和必填字段都集中在这里维护。
+# 这样模板下载和实际导入解析可以共用同一份配置，避免两边字段漂移。
 ENTITY_CONFIG: dict[str, dict[str, Any]] = {
     "projects": {
         "headers": [
@@ -116,6 +130,8 @@ ENTITY_CONFIG: dict[str, dict[str, Any]] = {
 }
 
 
+# 下面几个工具函数负责把 Excel / AI 返回的“弱类型文本值”
+# 统一转成数据库层需要的 Decimal / date / 业务字段。
 def _to_decimal(value: Any) -> Decimal | None:
     """将输入值转换为 Decimal。"""
     if value in (None, ""):
@@ -168,6 +184,7 @@ def _get_or_create_project(contract_data: dict[str, Any], db: Session) -> models
 
     project = db.query(models.Project).filter(models.Project.project_code == project_code).first()
     if project:
+        # AI 导入场景下，可能第一次只识别出了项目编号，后续补录时再把名称补齐。
         if not project.project_name and project_name:
             project.project_name = project_name
         return project
@@ -195,6 +212,7 @@ def download_template(entity: str):
     """下载 Excel 导入模板。"""
     config = _ensure_entity(entity)
 
+    # 模板只放两行：表头 + 示例，尽量保持轻量，方便业务人员直接另存后填写。
     workbook = Workbook()
     worksheet = workbook.active
     worksheet.title = "导入模板"
@@ -242,6 +260,7 @@ async def import_excel(
     if missing_headers:
         raise HTTPException(status_code=400, detail=f"缺少列：{', '.join(missing_headers)}")
 
+    # 结果按“成功 / 失败 / 跳过”累计，前端可以直接把它展示成导入报告。
     result = {"success": 0, "failed": 0, "skipped": 0, "errors": []}
 
     for row_number, row in enumerate(rows[1:], start=2):
@@ -258,6 +277,7 @@ async def import_excel(
                     raise ValueError(f"{required_field} 不能为空")
 
             if entity == "projects":
+                # 项目以 project_code 为幂等键。
                 project_code = str(row_data["project_code"]).strip()
                 existing = db.query(models.Project).filter(models.Project.project_code == project_code).first()
                 payload = {
@@ -280,11 +300,13 @@ async def import_excel(
                     db.add(models.Project(**payload))
 
             elif entity == "contracts":
+                # 合同必须先能找到所属项目，不能脱离项目独立导入。
                 project_code = str(row_data["project_code"]).strip()
                 project = db.query(models.Project).filter(models.Project.project_code == project_code).first()
                 if not project:
                     raise ValueError("项目编号不存在")
 
+                # 合同以 contract_code 为幂等键。
                 contract_code = str(row_data["contract_code"]).strip()
                 existing = db.query(models.Contract).filter(models.Contract.contract_code == contract_code).first()
                 payload = {
@@ -317,6 +339,7 @@ async def import_excel(
                     db.add(models.Contract(**payload))
 
             else:
+                # 付款以“合同 + 序号”识别重复记录；没有序号时只能新增。
                 contract_code = str(row_data["contract_code"]).strip()
                 contract = db.query(models.Contract).filter(models.Contract.contract_code == contract_code).first()
                 if not contract:
@@ -355,9 +378,11 @@ async def import_excel(
                 else:
                     db.add(models.Payment(**payload))
 
+            # 每一行单独提交，保证部分成功时不会因为一行脏数据拖垮整个文件。
             db.commit()
             result["success"] += 1
         except Exception as exc:  # noqa: BLE001
+            # 保留行号和错误文本，方便前端把失败明细直接反馈给用户。
             db.rollback()
             result["failed"] += 1
             result["errors"].append({"row": row_number, "message": str(exc)})
@@ -371,6 +396,7 @@ async def import_from_screenshot(files: list[UploadFile] = File(...)):
     if not files:
         raise HTTPException(status_code=400, detail="请至少上传一张截图")
 
+    # AI 服务接收的是图片内容，这里统一转成 base64 文本数组后再交给解析器。
     images_b64: list[str] = []
     for file in files:
         content = await file.read()
@@ -381,6 +407,7 @@ async def import_from_screenshot(files: list[UploadFile] = File(...)):
         raise HTTPException(status_code=400, detail="上传的截图内容为空")
 
     try:
+        # 这里只做识别，不做数据库写入。真正落库放在 confirm 接口，避免 AI 误识别直接污染数据。
         parsed_data, uncertain_fields = parse_screenshots(images_b64)
     except AIParserError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -412,10 +439,14 @@ def confirm_screenshot_import(payload: schemas.AIScreenshotConfirmRequest, db: S
     if _to_decimal(contract_data.get("amount")) is None:
         raise HTTPException(status_code=400, detail="合同金额不能为空")
 
+    # 截图识别导入采用“两段式提交”：
+    # 1. screenshot 接口只返回识别结果
+    # 2. confirm 接口在人工确认后一次性创建项目 / 合同 / 子表
     existing_contract = db.query(models.Contract).filter(models.Contract.contract_code == contract_code).first()
     if existing_contract:
         raise HTTPException(status_code=400, detail="合同编号已存在，请修改后再导入")
 
+    # 如果截图里没有完整项目信息，会自动兜底创建一个 AI 导入项目，避免合同成为孤儿数据。
     project = _get_or_create_project(contract_data, db)
 
     contract = models.Contract(
@@ -441,6 +472,7 @@ def confirm_screenshot_import(payload: schemas.AIScreenshotConfirmRequest, db: S
     db.add(contract)
     db.flush()
 
+    # 标的、付款计划、变更记录都挂在新合同下面一起落库，保证导入后的详情页数据是完整的。
     for index, item in enumerate(items, start=1):
         db.add(
             models.ContractItem(
@@ -475,6 +507,7 @@ def confirm_screenshot_import(payload: schemas.AIScreenshotConfirmRequest, db: S
 
     for index, change in enumerate(changes, start=1):
         change_date = _to_date(change.get("change_date"))
+        # 没有变更日期的记录通常不能成立，这里直接跳过而不是写入脏数据。
         if not change_date:
             continue
         db.add(

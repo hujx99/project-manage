@@ -291,12 +291,8 @@ const Dashboard = () => {
         <div className="dashboard-command-copy">
           <span className="dashboard-command-kicker">分析视角</span>
           <Typography.Title level={2} className="dashboard-command-title">
-            从“项目 -&gt; 合同 -&gt; 付款”这条链路里，
-            <br />
-            把结构、风险和责任人一起看清楚。
           </Typography.Title>
           <Typography.Paragraph className="dashboard-command-desc">
-            当前首页会自动每 60 秒刷新一次。你在列表页改状态、改金额或新增付款计划后，这里会自己更新，不需要手动重开页面。
           </Typography.Paragraph>
           <div className="dashboard-command-meta">
             <span>最近刷新：{formatRefreshTime(lastUpdated)}</span>
