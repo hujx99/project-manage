@@ -313,6 +313,279 @@ body {
   gap: 16px;
 }
 
+.dashboard-command {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 1fr);
+  gap: 20px;
+  padding: 26px;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.12), transparent 32%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.95));
+}
+
+.dashboard-command-copy {
+  min-width: 0;
+}
+
+.dashboard-command-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.dashboard-command-title {
+  margin: 14px 0 8px !important;
+}
+
+.dashboard-command-desc {
+  max-width: 640px;
+  margin-bottom: 0 !important;
+  color: #475569;
+}
+
+.dashboard-command-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 18px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.dashboard-command-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-command-card {
+  min-width: 0;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.14);
+}
+
+.dashboard-command-card span {
+  color: rgba(226, 232, 240, 0.82);
+  font-size: 12px;
+}
+
+.dashboard-command-card strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.dashboard-command-card strong em {
+  margin-left: 4px;
+  font-style: normal;
+  font-size: 13px;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.dashboard-command-card p {
+  margin: 12px 0 0;
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.dashboard-health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboard-health-card {
+  border-radius: 20px;
+}
+
+.dashboard-health-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dashboard-health-label {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.dashboard-health-value {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.dashboard-health-subtitle {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dashboard-health-percent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dashboard-health-percent small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dashboard-health-hint {
+  margin-top: 10px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dashboard-funnel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboard-funnel-card {
+  border-radius: 20px;
+}
+
+.dashboard-funnel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dashboard-funnel-head strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.dashboard-funnel-head span {
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dashboard-funnel-count {
+  margin-top: 12px;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.dashboard-funnel-desc {
+  margin-top: 8px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.dashboard-chart-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-chart-grid-primary {
+  grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(280px, 1fr));
+}
+
+.dashboard-chart-grid-secondary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-chart-caption {
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dashboard-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboard-insight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-insight-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  text-decoration: none;
+}
+
+.dashboard-insight-copy {
+  min-width: 0;
+}
+
+.dashboard-insight-title {
+  color: #0f172a;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.dashboard-insight-meta {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dashboard-insight-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.dashboard-insight-money {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dashboard-insight-mini {
+  color: #64748b;
+  font-size: 12px;
+}
+
 .dashboard-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.9fr);
@@ -662,11 +935,13 @@ body {
 }
 
 .page-panel .ant-table-cell {
+  overflow: hidden;
   white-space: nowrap;
 }
 
 .page-panel .table-link-ellipsis {
-  display: inline-block;
+  display: block;
+  width: 100%;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -833,6 +1108,15 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .dashboard-command,
+  .dashboard-health-grid,
+  .dashboard-funnel-grid,
+  .dashboard-chart-grid-primary,
+  .dashboard-chart-grid-secondary,
+  .dashboard-insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .dashboard-hero,
   .dashboard-flow-grid,
   .dashboard-rule-grid,
@@ -845,6 +1129,10 @@ body {
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-command-copy {
+    grid-column: 1 / -1;
   }
 }
 
@@ -972,6 +1260,31 @@ body {
 
   .summary-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-command,
+  .dashboard-command-grid,
+  .dashboard-health-grid,
+  .dashboard-funnel-grid,
+  .dashboard-chart-grid-primary,
+  .dashboard-chart-grid-secondary,
+  .dashboard-insight-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-command {
+    padding: 18px;
+  }
+
+  .dashboard-health-head,
+  .dashboard-funnel-head,
+  .dashboard-insight-item {
+    flex-direction: column;
+  }
+
+  .dashboard-health-percent,
+  .dashboard-insight-side {
+    align-items: flex-start;
   }
 
   .dashboard-hero,

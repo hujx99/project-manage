@@ -1,32 +1,54 @@
-import { Alert, Card, Progress, Skeleton, Statistic, Table, Tag, Typography, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { Pie } from '@ant-design/charts';
+import { Alert, Card, Progress, Skeleton, Tag, Typography, message } from 'antd';
+import { Bar, Column, Pie } from '@ant-design/charts';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getPaymentStatusColor, normalizePaymentStatus } from '../constants/business';
+import { PROJECT_STATUS_COLORS, getPaymentStatusColor, normalizePaymentStatus } from '../constants/business';
 import useIsMobile from '../hooks/useIsMobile';
-import {
-  fetchDashboardSummary,
-  fetchDashboardWorkflow,
-  fetchPendingPayments,
-  type DashboardSummary,
-  type DashboardWorkflowSummary,
-  type PendingPayment,
-} from '../services/dashboard';
+import { fetchDashboardAnalysis, type DashboardAnalysis } from '../services/dashboard';
+
+const REFRESH_INTERVAL = 60_000;
 
 function formatMoney(value: number) {
-  return `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function getDiffDays(dateString: string | null) {
-  if (!dateString) {
-    return Number.POSITIVE_INFINITY;
+function formatMoneyCompact(value: number) {
+  const amount = Number(value || 0);
+  const absAmount = Math.abs(amount);
+
+  if (absAmount >= 100000000) {
+    return `¥${(amount / 100000000).toFixed(2)}亿`;
   }
 
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(`${dateString}T00:00:00`);
-  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (absAmount >= 10000) {
+    return `¥${(amount / 10000).toFixed(2)}万`;
+  }
+
+  return formatMoney(amount);
+}
+
+function formatPercent(value: number) {
+  return `${Number(value || 0).toFixed(1)}%`;
+}
+
+function formatRefreshTime(value: Date | null) {
+  if (!value) {
+    return '尚未刷新';
+  }
+
+  return value.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function shortenText(value: string, limit = 12) {
+  if (!value) {
+    return '未填写';
+  }
+
+  return value.length > limit ? `${value.slice(0, limit)}...` : value;
 }
 
 function getDueMeta(diffDays: number) {
@@ -39,227 +61,320 @@ function getDueMeta(diffDays: number) {
   if (diffDays <= 7) {
     return { label: '7天内', color: 'orange' };
   }
-  return { label: '待处理', color: 'blue' };
+  if (diffDays <= 30) {
+    return { label: '30天内', color: 'gold' };
+  }
+  return { label: '后续计划', color: 'blue' };
+}
+
+function getHealthTone(score: number) {
+  if (score >= 75) {
+    return { label: '整体稳健', color: '#16a34a' };
+  }
+  if (score >= 50) {
+    return { label: '中等承压', color: '#d97706' };
+  }
+  return { label: '需要干预', color: '#dc2626' };
 }
 
 const Dashboard = () => {
   const isMobile = useIsMobile();
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [workflow, setWorkflow] = useState<DashboardWorkflowSummary | null>(null);
-  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
+  const [analysis, setAnalysis] = useState<DashboardAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
+    let mounted = true;
+
+    const loadData = async (silent = false) => {
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       try {
-        const [summaryResult, pendingResult, workflowResult] = await Promise.all([
-          fetchDashboardSummary(),
-          fetchPendingPayments(),
-          fetchDashboardWorkflow(),
-        ]);
-        setSummary(summaryResult);
-        setPendingPayments(pendingResult);
-        setWorkflow(workflowResult);
+        const result = await fetchDashboardAnalysis();
+        if (!mounted) {
+          return;
+        }
+
+        setAnalysis(result);
+        setLastUpdated(new Date());
       } catch (error) {
-        message.error((error as Error).message);
+        if (mounted) {
+          message.error((error as Error).message);
+        }
       } finally {
+        if (!mounted) {
+          return;
+        }
+
         setLoading(false);
+        setRefreshing(false);
       }
     };
 
     void loadData();
+    const timer = window.setInterval(() => {
+      void loadData(true);
+    }, REFRESH_INTERVAL);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
   }, []);
 
-  const prioritizedPayments = useMemo(() => {
-    return pendingPayments
-      .map((item) => ({ ...item, diffDays: getDiffDays(item.planned_date) }))
-      .sort((a, b) => a.diffDays - b.diffDays || b.amount - a.amount);
-  }, [pendingPayments]);
+  const financialHealth = analysis?.financial_health;
+  const coverage = analysis?.coverage;
+  const funnel = analysis?.funnel;
+  const paymentRisk = analysis?.payment_risk;
 
-  const urgentIds = useMemo(
-    () => new Set(prioritizedPayments.filter((item) => item.diffDays <= 7).map((item) => item.id)),
-    [prioritizedPayments],
-  );
+  const healthScore = useMemo(() => {
+    if (!analysis) {
+      return 0;
+    }
 
-  const overdueCount = prioritizedPayments.filter((item) => item.diffDays < 0).length;
-  const focusPayments = prioritizedPayments.slice(0, 5);
-  const topStatus = useMemo(() => {
-    return (summary?.project_status_distribution ?? []).reduce(
-      (current, item) => (item.count > current.count ? item : current),
-      { status: '暂无主状态', count: 0 },
-    );
-  }, [summary?.project_status_distribution]);
+    const score =
+      analysis.coverage.project_contract_link_rate * 0.25 +
+      analysis.coverage.contract_payment_plan_rate * 0.2 +
+      Math.max(0, 100 - analysis.coverage.payment_overdue_rate) * 0.35 +
+      analysis.financial_health.payment_execution_rate * 0.2;
 
-  const paymentExecutionRate =
-    summary?.total_contract_amount && Number(summary.total_contract_amount) > 0
-      ? Math.round((Number(summary.total_paid_amount) / Number(summary.total_contract_amount)) * 100)
-      : 0;
-  const pendingShare =
-    summary?.total_contract_amount && Number(summary.total_contract_amount) > 0
-      ? Math.round((Number(summary.total_pending_amount) / Number(summary.total_contract_amount)) * 100)
-      : 0;
+    return Math.round(score);
+  }, [analysis]);
 
-  const flowCards = useMemo(
-    () => [
-      {
-        step: '01',
-        title: '项目立项',
-        description: '项目是最上游主台账，先定预算、负责人和当前阶段，再进入合同。',
-        href: '/projects',
-        action: '去项目台账',
-        metrics: [
-          { label: '项目总数', value: workflow?.project_stage.total ?? 0 },
-          { label: '进行中', value: workflow?.project_stage.active_count ?? 0 },
-          { label: '未落合同', value: workflow?.project_stage.unlinked_count ?? 0 },
-        ],
-      },
-      {
-        step: '02',
-        title: '合同执行',
-        description: '合同挂在项目下，是执行主体，金额、标的、变更和付款计划都在这里维护。',
-        href: '/contracts',
-        action: '去合同执行',
-        metrics: [
-          { label: '合同总数', value: workflow?.contract_stage.total ?? 0 },
-          { label: '执行中', value: workflow?.contract_stage.active_count ?? 0 },
-          { label: '未设付款计划', value: workflow?.contract_stage.without_payment_count ?? 0 },
-        ],
-      },
-      {
-        step: '03',
-        title: '付款跟踪',
-        description: '付款不能脱离合同存在，付款列表是跨项目的统一催办和执行跟踪视图。',
-        href: '/payments',
-        action: '去付款跟踪',
-        metrics: [
-          { label: '付款总数', value: workflow?.payment_stage.total ?? 0 },
-          { label: '待提报/待支付', value: workflow?.payment_stage.unpaid_count ?? 0 },
-          { label: '逾期/临期', value: (workflow?.payment_stage.overdue_count ?? 0) + (workflow?.payment_stage.due_soon_count ?? 0) },
-        ],
-      },
-    ],
-    [workflow],
-  );
+  const topVendorShare = useMemo(() => {
+    if (!analysis || !analysis.vendor_concentration.length || !analysis.financial_health.total_contract_amount) {
+      return 0;
+    }
 
-  const columns: ColumnsType<PendingPayment> = [
+    const topThree = analysis.vendor_concentration.slice(0, 3).reduce((sum, item) => sum + item.amount_total, 0);
+    return Math.round((topThree / analysis.financial_health.total_contract_amount) * 100);
+  }, [analysis]);
+
+  const healthTone = getHealthTone(healthScore);
+  const closedProjectCount = (funnel?.project_total ?? 0) - (funnel?.active_project_count ?? 0);
+
+  const headlineCards = [
     {
-      title: '项目名称',
-      dataIndex: 'project_name',
-      render: (value: string, record) => (
-        <div className="table-cell-stack">
-          <span className="table-cell-title">{value}</span>
-          {isMobile && <span className="table-cell-subtitle">{record.contract_name || '-'}</span>}
-        </div>
-      ),
-    },
-    { title: '合同名称', dataIndex: 'contract_name', responsive: ['md'] },
-    {
-      title: '金额',
-      dataIndex: 'amount',
-      width: 160,
-      render: (value: number) => formatMoney(value),
+      label: '执行健康度',
+      value: `${healthScore}`,
+      suffix: '分',
+      accent: healthTone.color,
+      description: `${healthTone.label}，综合考虑合同覆盖、付款计划、逾期率和付款执行率。`,
     },
     {
-      title: '计划日期',
-      dataIndex: 'planned_date',
-      width: 140,
-      render: (value: string | null, record) => (
-        <span style={urgentIds.has(record.id) ? { color: '#cf1322', fontWeight: 600 } : undefined}>
-          {value || '-'}
-        </span>
-      ),
+      label: '合同覆盖率',
+      value: formatPercent(coverage?.project_contract_link_rate ?? 0),
+      accent: '#2563eb',
+      description: `${funnel?.projects_with_contracts ?? 0} / ${funnel?.project_total ?? 0} 个项目已经进入合同执行。`,
     },
     {
-      title: '状态',
-      dataIndex: 'payment_status',
-      width: 120,
-      responsive: ['sm'],
-      render: (value: string) => <Tag color={getPaymentStatusColor(value)}>{normalizePaymentStatus(value)}</Tag>,
+      label: '付款逾期率',
+      value: formatPercent(coverage?.payment_overdue_rate ?? 0),
+      accent: '#dc2626',
+      description: `${paymentRisk?.overdue_count ?? 0} 笔已逾期，当前待付金额 ${formatMoney(paymentRisk?.overdue_amount ?? 0)}。`,
+    },
+    {
+      label: '供应商集中度',
+      value: `${topVendorShare}%`,
+      accent: '#7c3aed',
+      description: `合同金额前三供应商占总合同额 ${topVendorShare}% 。`,
     },
   ];
 
+  const healthCards = [
+    {
+      title: '预算转合同',
+      percent: financialHealth?.budget_usage_rate ?? 0,
+      rateLabel: '转化率',
+      strokeColor: '#2563eb',
+      primary: formatMoneyCompact(financialHealth?.total_contract_amount ?? 0),
+      secondary: `合同 ${formatMoney(financialHealth?.total_contract_amount ?? 0)} / 预算 ${formatMoney(financialHealth?.total_budget ?? 0)}`,
+      hint: '看预算是否已经真正进入执行。',
+    },
+    {
+      title: '合同转已付',
+      percent: financialHealth?.payment_execution_rate ?? 0,
+      rateLabel: '转化率',
+      strokeColor: '#16a34a',
+      primary: formatMoneyCompact(financialHealth?.total_paid_amount ?? 0),
+      secondary: `已付 ${formatMoney(financialHealth?.total_paid_amount ?? 0)} / 合同 ${formatMoney(financialHealth?.total_contract_amount ?? 0)}`,
+      hint: '看签约金额有多少已经落到付款结果。',
+    },
+    {
+      title: '待付压力',
+      percent: financialHealth?.pending_pressure_rate ?? 0,
+      rateLabel: '压力率',
+      strokeColor: '#d97706',
+      primary: formatMoneyCompact(financialHealth?.total_pending_amount ?? 0),
+      secondary: `待付 ${formatMoney(financialHealth?.total_pending_amount ?? 0)} / 逾期 ${formatMoney(paymentRisk?.overdue_amount ?? 0)}`,
+      hint: '看未支付金额对当前合同池形成多大压力。',
+    },
+    {
+      title: '项目结项率',
+      percent: coverage?.closed_project_rate ?? 0,
+      rateLabel: '覆盖率',
+      strokeColor: '#7c3aed',
+      primary: `${closedProjectCount}`,
+      secondary: `项目总数 ${funnel?.project_total ?? 0}`,
+      hint: '看项目组合里存量项目的闭环程度。',
+    },
+  ];
+
+  const funnelCards = [
+    {
+      title: '项目进入合同',
+      value: coverage?.project_contract_link_rate ?? 0,
+      countLabel: `${funnel?.projects_with_contracts ?? 0} / ${funnel?.project_total ?? 0}`,
+      description: `${funnel?.projects_without_contracts ?? 0} 个项目已建账但还没落到合同。`,
+      link: '/projects',
+      linkLabel: '查看项目链路',
+    },
+    {
+      title: '合同拆到付款',
+      value: coverage?.contract_payment_plan_rate ?? 0,
+      countLabel: `${funnel?.contracts_with_payment_plans ?? 0} / ${funnel?.contract_total ?? 0}`,
+      description: `${funnel?.contracts_without_payment_plans ?? 0} 份合同还没有付款计划。`,
+      link: '/contracts',
+      linkLabel: '查看合同执行',
+    },
+    {
+      title: '付款形成闭环',
+      value: funnel?.payment_total ? Math.round(((funnel?.paid_payment_count ?? 0) / funnel.payment_total) * 1000) / 10 : 0,
+      countLabel: `${funnel?.paid_payment_count ?? 0} / ${funnel?.payment_total ?? 0}`,
+      description: `${funnel?.unpaid_payment_count ?? 0} 笔仍在待办池，${paymentRisk?.overdue_count ?? 0} 笔已转成逾期。`,
+      link: '/payments',
+      linkLabel: '查看付款跟踪',
+    },
+  ];
+
+  const managerChartData = useMemo(
+    () =>
+      (analysis?.manager_load ?? []).map((item) => ({
+        manager: shortenText(item.manager, 8),
+        fullName: item.manager,
+        pending_total: item.pending_total,
+        active_project_count: item.active_project_count,
+        unlinked_project_count: item.unlinked_project_count,
+      })),
+    [analysis?.manager_load],
+  );
+
+  const vendorChartData = useMemo(
+    () =>
+      (analysis?.vendor_concentration ?? []).map((item) => ({
+        vendor: shortenText(item.vendor, 10),
+        fullName: item.vendor,
+        amount_total: item.amount_total,
+        contract_count: item.contract_count,
+        pending_total: item.pending_total,
+      })),
+    [analysis?.vendor_concentration],
+  );
+
   return (
-    <div className="detail-stack">
+    <div className="detail-stack dashboard-stack">
       <div>
         <Typography.Title level={3} style={{ marginBottom: 4 }}>
-          业务总览
+          经营分析仪表盘
         </Typography.Title>
         <Typography.Text type="secondary">
-          先把业务链路看清楚：项目先建台账，合同承接执行，付款负责落地跟踪。
+          首页不再只罗列总数，而是直接回答三个问题：业务卡在哪一段、资金压在哪一段、谁现在最需要被盯住。
         </Typography.Text>
       </div>
 
-      <div className="page-panel dashboard-hero">
-        <div className="dashboard-hero-copy">
-          <span className="dashboard-hero-kicker">业务流程</span>
-          <Typography.Title level={2} className="dashboard-hero-title">
-            这套系统不是三个并列表，
+      <div className="page-panel dashboard-command">
+        <div className="dashboard-command-copy">
+          <span className="dashboard-command-kicker">分析视角</span>
+          <Typography.Title level={2} className="dashboard-command-title">
+            从“项目 -&gt; 合同 -&gt; 付款”这条链路里，
             <br />
-            而是一条从项目到付款的执行链路。
+            把结构、风险和责任人一起看清楚。
           </Typography.Title>
-          <Typography.Paragraph className="dashboard-hero-desc">
-            项目负责立项和阶段管理，合同负责承接执行，付款负责结果跟踪。首页优先展示当前卡点，而不是只堆统计数字。
+          <Typography.Paragraph className="dashboard-command-desc">
+            当前首页会自动每 60 秒刷新一次。你在列表页改状态、改金额或新增付款计划后，这里会自己更新，不需要手动重开页面。
           </Typography.Paragraph>
-          <div className="dashboard-highlight-grid">
-            <div className="dashboard-highlight-card">
-              <span>未落合同项目</span>
-              <strong>{workflow?.project_stage.unlinked_count ?? 0}</strong>
-              <em>说明项目已建账，但还没进入合同执行</em>
-            </div>
-            <div className="dashboard-highlight-card">
-              <span>未设付款计划合同</span>
-              <strong>{workflow?.contract_stage.without_payment_count ?? 0}</strong>
-              <em>合同已建立，但还没拆解成付款动作</em>
-            </div>
-            <div className="dashboard-highlight-card">
-              <span>逾期 / 临期待付</span>
-              <strong>{(workflow?.payment_stage.overdue_count ?? 0) + (workflow?.payment_stage.due_soon_count ?? 0)}</strong>
-              <em>说明执行已经到付款阶段，需要跟催</em>
-            </div>
+          <div className="dashboard-command-meta">
+            <span>最近刷新：{formatRefreshTime(lastUpdated)}</span>
+            <span>{refreshing ? '正在同步最新数据...' : '实时轮询开启中'}</span>
           </div>
         </div>
 
-        <div className="dashboard-hero-side">
-          <div className="dashboard-progress-card">
-            <strong>付款执行率</strong>
-            <Progress percent={paymentExecutionRate} strokeColor="#22c55e" trailColor="rgba(148, 163, 184, 0.25)" />
-            <div className="dashboard-progress-meta">
-              <span>已付：{formatMoney(summary?.total_paid_amount ?? 0)}</span>
-              <span>合同额：{formatMoney(summary?.total_contract_amount ?? 0)}</span>
+        <div className="dashboard-command-grid">
+          {headlineCards.map((item) => (
+            <div key={item.label} className="dashboard-command-card">
+              {loading && !analysis ? (
+                <Skeleton active paragraph={{ rows: 2 }} />
+              ) : (
+                <>
+                  <span>{item.label}</span>
+                  <strong style={{ color: item.accent }}>
+                    {item.value}
+                    {item.suffix ? <em>{item.suffix}</em> : null}
+                  </strong>
+                  <p>{item.description}</p>
+                </>
+              )}
             </div>
-          </div>
-          <div className="dashboard-progress-card">
-            <strong>待付压力</strong>
-            <Progress percent={pendingShare} strokeColor="#f59e0b" trailColor="rgba(148, 163, 184, 0.25)" />
-            <div className="dashboard-progress-meta">
-              <span>待付：{formatMoney(summary?.total_pending_amount ?? 0)}</span>
-              <span>近30天提醒：{pendingPayments.length} 笔</span>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      <div className="dashboard-flow-grid">
-        {flowCards.map((item) => (
-          <Card key={item.step} className="page-panel dashboard-flow-card">
-            {loading ? (
-              <Skeleton active paragraph={{ rows: 5 }} />
+      {(paymentRisk?.overdue_count ?? 0) > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          message={`当前有 ${paymentRisk?.overdue_count ?? 0} 笔付款已经逾期，逾期待付金额 ${formatMoney(paymentRisk?.overdue_amount ?? 0)}。`}
+          description="建议先处理逾期存量，再去看未来 7 天内的新到期事项；否则仪表盘的风险读数会持续恶化。"
+        />
+      )}
+
+      <div className="dashboard-health-grid">
+        {healthCards.map((item) => (
+          <Card key={item.title} className="page-panel dashboard-health-card">
+            {loading && !analysis ? (
+              <Skeleton active paragraph={{ rows: 3 }} />
             ) : (
               <>
-                <div className="dashboard-flow-step">{item.step}</div>
-                <div className="dashboard-flow-title">{item.title}</div>
-                <div className="dashboard-flow-desc">{item.description}</div>
-                <div className="dashboard-flow-metrics">
-                  {item.metrics.map((metric) => (
-                    <div key={metric.label} className="dashboard-flow-metric">
-                      <span>{metric.label}</span>
-                      <strong>{metric.value}</strong>
-                    </div>
-                  ))}
+                <div className="dashboard-health-head">
+                  <div>
+                    <span className="dashboard-health-label">{item.title}</span>
+                    <strong className="dashboard-health-value">{item.primary}</strong>
+                    <div className="dashboard-health-subtitle">{item.secondary}</div>
+                  </div>
+                  <div className="dashboard-health-percent">
+                    <small>{item.rateLabel}</small>
+                    {formatPercent(item.percent)}
+                  </div>
                 </div>
-                <Link to={item.href} className="dashboard-flow-link">
-                  {item.action}
+                <Progress percent={item.percent} strokeColor={item.strokeColor} trailColor="rgba(148, 163, 184, 0.2)" showInfo={false} />
+                <div className="dashboard-health-hint">{item.hint}</div>
+              </>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      <div className="dashboard-funnel-grid">
+        {funnelCards.map((item) => (
+          <Card key={item.title} className="page-panel dashboard-funnel-card">
+            {loading && !analysis ? (
+              <Skeleton active paragraph={{ rows: 3 }} />
+            ) : (
+              <>
+                <div className="dashboard-funnel-head">
+                  <strong>{item.title}</strong>
+                  <span>{formatPercent(item.value)}</span>
+                </div>
+                <Progress percent={item.value} strokeColor="#2563eb" trailColor="rgba(148, 163, 184, 0.2)" showInfo={false} />
+                <div className="dashboard-funnel-count">{item.countLabel}</div>
+                <div className="dashboard-funnel-desc">{item.description}</div>
+                <Link to={item.link} className="dashboard-flow-link">
+                  {item.linkLabel}
                 </Link>
               </>
             )}
@@ -267,67 +382,60 @@ const Dashboard = () => {
         ))}
       </div>
 
-      <Card className="page-panel" title="系统规则">
-        <div className="dashboard-rule-grid">
-          <div className="dashboard-rule-card">
-            <strong>项目是上游主台账</strong>
-            <span>先确定预算、负责人和阶段。已有合同的项目不能直接删除。</span>
-          </div>
-          <div className="dashboard-rule-card">
-            <strong>合同是执行主体</strong>
-            <span>合同必须挂项目，标的清单、变更记录和付款计划都在合同详情里维护。</span>
-          </div>
-          <div className="dashboard-rule-card">
-            <strong>付款是结果跟踪</strong>
-            <span>付款不能脱离合同存在，待付款自动按计划金额减实付金额计算。</span>
-          </div>
-        </div>
-      </Card>
+      <div className="dashboard-chart-grid dashboard-chart-grid-primary">
+        <Card className="page-panel" title="付款风险分层">
+          {loading && !analysis ? (
+            <Skeleton active paragraph={{ rows: 8 }} />
+          ) : (
+            <>
+              <Column
+                data={analysis?.payment_due_buckets ?? []}
+                xField="label"
+                yField="amount"
+                color={({ key }: { key: string }) => {
+                  if (key === 'overdue') {
+                    return '#dc2626';
+                  }
+                  if (key === 'today' || key === 'within_7_days') {
+                    return '#f59e0b';
+                  }
+                  if (key === 'within_30_days') {
+                    return '#3b82f6';
+                  }
+                  return '#94a3b8';
+                }}
+                label={{
+                  text: (data: { amount: number }) => (data.amount ? `${Math.round(data.amount / 10000)}万` : ''),
+                  style: { fill: '#475569', fontSize: 12 },
+                }}
+                axis={{ y: { labelFormatter: (value: string) => `${Math.round(Number(value) / 10000)}万` } }}
+                tooltip={{
+                  items: [
+                    (datum: { label: string; amount: number; count: number }) => ({
+                      name: datum.label,
+                      value: `${formatMoney(datum.amount)} / ${datum.count} 笔`,
+                    }),
+                  ],
+                }}
+                height={isMobile ? 260 : 320}
+              />
+              <div className="dashboard-chart-caption">
+                红色代表已经形成逾期，橙色代表短期内会继续转成催办压力。
+              </div>
+            </>
+          )}
+        </Card>
 
-      <div className="dashboard-metrics-grid">
-        <Card className="page-panel dashboard-metric-card">
-          <Statistic title="项目数" value={summary?.project_count ?? 0} loading={loading} />
-        </Card>
-        <Card className="page-panel dashboard-metric-card">
-          <Statistic title="合同数" value={summary?.contract_count ?? 0} loading={loading} />
-        </Card>
-        <Card className="page-panel dashboard-metric-card">
-          <Statistic title="付款笔数" value={summary?.payment_count ?? 0} loading={loading} />
-        </Card>
-        <Card className="page-panel dashboard-metric-card">
-          <Statistic title="项目总预算" value={summary?.total_budget ?? 0} prefix="¥" precision={2} loading={loading} />
-        </Card>
-        <Card className="page-panel dashboard-metric-card">
-          <Statistic
-            title="合同总额"
-            value={summary?.total_contract_amount ?? 0}
-            prefix="¥"
-            precision={2}
-            loading={loading}
-          />
-        </Card>
-        <Card className="page-panel dashboard-metric-card">
-          <Statistic
-            title="已付总额"
-            value={summary?.total_paid_amount ?? 0}
-            prefix="¥"
-            precision={2}
-            loading={loading}
-          />
-        </Card>
-      </div>
-
-      <div className="dashboard-secondary-grid">
-        <Card className="page-panel" title="项目状态分布">
-          {loading ? (
+        <Card className="page-panel" title="项目状态结构">
+          {loading && !analysis ? (
             <Skeleton active paragraph={{ rows: 8 }} />
           ) : (
             <Pie
-              data={summary?.project_status_distribution ?? []}
+              data={analysis?.project_status_distribution ?? []}
               angleField="count"
               colorField="status"
               radius={0.82}
-              innerRadius={0.45}
+              innerRadius={0.48}
               legend={{ color: { position: 'bottom', itemMarker: 'circle' } }}
               labels={[
                 {
@@ -341,59 +449,194 @@ const Dashboard = () => {
           )}
         </Card>
 
-        <Card className="page-panel" title="当前最值得先处理的事">
-          {overdueCount > 0 && (
-            <Alert
-              type="error"
-              showIcon
-              style={{ marginBottom: 14 }}
-              message={`当前有 ${overdueCount} 笔付款已逾期，建议优先处理。`}
+        <Card className="page-panel" title="合同状态结构">
+          {loading && !analysis ? (
+            <Skeleton active paragraph={{ rows: 8 }} />
+          ) : (
+            <Pie
+              data={analysis?.contract_status_distribution ?? []}
+              angleField="count"
+              colorField="status"
+              radius={0.82}
+              innerRadius={0.48}
+              legend={{ color: { position: 'bottom', itemMarker: 'circle' } }}
+              labels={[
+                {
+                  text: (data: { status: string; count: number }) => `${data.status} ${data.count}`,
+                  position: 'outside',
+                  style: { fontSize: 12 },
+                },
+              ]}
+              height={isMobile ? 260 : 320}
             />
           )}
-          <div className="dashboard-priority-list">
-            {focusPayments.length ? (
-              focusPayments.map((item) => {
-                const dueMeta = getDueMeta(item.diffDays);
-                return (
-                  <div key={item.id} className="dashboard-priority-item">
-                    <div className="dashboard-priority-copy">
-                      <div className="dashboard-priority-title">{item.project_name}</div>
-                      <div className="dashboard-priority-meta">{item.contract_name || '未关联合同'}</div>
-                      <div className="dashboard-priority-meta">计划日期：{item.planned_date || '-'}</div>
-                    </div>
-                    <div className="dashboard-priority-side">
-                      <Tag color={dueMeta.color}>{dueMeta.label}</Tag>
-                      <span className="dashboard-priority-amount">{formatMoney(item.amount)}</span>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="dashboard-empty">近 30 天内没有需要重点盯办的付款。</div>
-            )}
-          </div>
         </Card>
       </div>
 
-      <Card className="page-panel" title="待付款提醒">
-        {urgentIds.size > 0 && (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message={`当前主项目阶段是 ${topStatus.status}，红色日期表示 7 天内临近到期，请优先处理。`}
-          />
+      <div className="dashboard-chart-grid dashboard-chart-grid-secondary">
+        <Card className="page-panel" title="责任人负载">
+          {loading && !analysis ? (
+            <Skeleton active paragraph={{ rows: 8 }} />
+          ) : (
+            <>
+              <Bar
+                data={managerChartData}
+                xField="pending_total"
+                yField="manager"
+                seriesField="manager"
+                legend={false}
+                color="#2563eb"
+                axis={{ x: { labelFormatter: (value: string) => `${Math.round(Number(value) / 10000)}万` } }}
+                tooltip={{
+                  items: [
+                    (datum: { fullName: string; pending_total: number; active_project_count: number; unlinked_project_count: number }) => ({
+                      name: datum.fullName,
+                      value: `${formatMoney(datum.pending_total)} / 活跃项目 ${datum.active_project_count} / 未落合同 ${datum.unlinked_project_count}`,
+                    }),
+                  ],
+                }}
+                height={isMobile ? 280 : 340}
+              />
+              <div className="dashboard-chart-caption">
+                这里按“责任人名下待付金额”排序，便于先找真正需要协调的人。
+              </div>
+            </>
+          )}
+        </Card>
+
+        <Card className="page-panel" title="供应商集中度">
+          {loading && !analysis ? (
+            <Skeleton active paragraph={{ rows: 8 }} />
+          ) : (
+            <>
+              <Bar
+                data={vendorChartData}
+                xField="amount_total"
+                yField="vendor"
+                seriesField="vendor"
+                legend={false}
+                color="#7c3aed"
+                axis={{ x: { labelFormatter: (value: string) => `${Math.round(Number(value) / 10000)}万` } }}
+                tooltip={{
+                  items: [
+                    (datum: { fullName: string; amount_total: number; contract_count: number; pending_total: number }) => ({
+                      name: datum.fullName,
+                      value: `${formatMoney(datum.amount_total)} / ${datum.contract_count} 份合同 / 待付 ${formatMoney(datum.pending_total)}`,
+                    }),
+                  ],
+                }}
+                height={isMobile ? 280 : 340}
+              />
+              <div className="dashboard-chart-caption">
+                金额集中度越高，越适合在付款、续签和风险管理上单独建立跟踪清单。
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
+
+      <div className="dashboard-insight-grid">
+        <Card className="page-panel" title="高风险项目清单">
+          {loading && !analysis ? (
+            <Skeleton active paragraph={{ rows: 6 }} />
+          ) : (
+            <div className="dashboard-insight-list">
+              {(analysis?.top_risk_projects ?? []).length ? (
+                analysis?.top_risk_projects.map((item) => (
+                  <Link key={item.project_id} to={`/projects/${item.project_id}`} className="dashboard-insight-item">
+                    <div className="dashboard-insight-copy">
+                      <div className="dashboard-insight-title">{item.project_name}</div>
+                      <div className="dashboard-insight-meta">
+                        负责人：{item.manager} · 合同 {item.contract_count} 份 · 风险分 {item.risk_score}
+                      </div>
+                    </div>
+                    <div className="dashboard-insight-side">
+                      <Tag color={PROJECT_STATUS_COLORS[item.status] ?? 'default'}>{item.status}</Tag>
+                      <span className="dashboard-insight-money">{formatMoney(item.pending_total)}</span>
+                      <div className="dashboard-insight-mini">
+                        逾期 {item.overdue_count} · 临期 {item.due_soon_count}
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="dashboard-empty">当前没有识别出明显的高风险项目。</div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        <Card className="page-panel" title="优先付款事项">
+          {loading && !analysis ? (
+            <Skeleton active paragraph={{ rows: 6 }} />
+          ) : (
+            <div className="dashboard-insight-list">
+              {(analysis?.priority_payments ?? []).length ? (
+                analysis?.priority_payments.map((item) => {
+                  const dueMeta = getDueMeta(item.diff_days);
+                  return (
+                    <div key={item.id} className="dashboard-insight-item">
+                      <div className="dashboard-insight-copy">
+                        <div className="dashboard-insight-title">{item.project_name}</div>
+                        <div className="dashboard-insight-meta">{item.contract_name || '未关联合同'}</div>
+                        <div className="dashboard-insight-meta">
+                          负责人：{item.manager} · 计划日期：{item.planned_date || '-'}
+                        </div>
+                      </div>
+                      <div className="dashboard-insight-side">
+                        <Tag color={dueMeta.color}>{dueMeta.label}</Tag>
+                        <Tag color={getPaymentStatusColor(item.payment_status)}>{normalizePaymentStatus(item.payment_status)}</Tag>
+                        <span className="dashboard-insight-money">{formatMoney(item.amount)}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="dashboard-empty">当前没有需要优先跟进的付款事项。</div>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <Card className="page-panel" title="当前分析结论">
+        {loading && !analysis ? (
+          <Skeleton active paragraph={{ rows: 4 }} />
+        ) : (
+          <div className="dashboard-rule-grid">
+            <div className="dashboard-rule-card">
+              <strong>项目侧</strong>
+              <span>
+                当前还有 {funnel?.projects_without_contracts ?? 0} 个项目未进入合同执行，项目到合同的衔接率是{' '}
+                {formatPercent(coverage?.project_contract_link_rate ?? 0)}。
+              </span>
+            </div>
+            <div className="dashboard-rule-card">
+              <strong>合同侧</strong>
+              <span>
+                {funnel?.contracts_without_payment_plans ?? 0} 份合同还没有拆付款计划，说明执行台账还没有完全传递到资金侧。
+              </span>
+            </div>
+            <div className="dashboard-rule-card">
+              <strong>付款侧</strong>
+              <span>
+                付款逾期率已到 {formatPercent(coverage?.payment_overdue_rate ?? 0)}，当前最大的管理重点不是新增统计，而是先消化逾期存量。
+              </span>
+            </div>
+            <div className="dashboard-rule-card">
+              <strong>责任侧</strong>
+              <span>责任人负载按待付金额排序，适合直接用于周例会或付款推进会的点名清单。</span>
+            </div>
+            <div className="dashboard-rule-card">
+              <strong>供应商侧</strong>
+              <span>供应商集中度图可以帮助判断付款和续签风险是否集中在少数合作方身上。</span>
+            </div>
+            <div className="dashboard-rule-card">
+              <strong>刷新机制</strong>
+              <span>仪表盘每 60 秒自动刷新一次，前后端开发模式启动后，你会直接看到修改后的实时状态。</span>
+            </div>
+          </div>
         )}
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={pendingPayments}
-          loading={loading}
-          size={isMobile ? 'small' : 'middle'}
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: 640 }}
-          locale={{ emptyText: '未来 30 天内暂无待付款记录' }}
-        />
       </Card>
     </div>
   );

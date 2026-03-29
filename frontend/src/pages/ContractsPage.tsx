@@ -141,14 +141,20 @@ const ContractsPage = () => {
     {
       title: '合同编号',
       dataIndex: 'contract_code',
-      width: 200,
+      width: 260,
       responsive: ['md'],
+      ellipsis: true,
       sorter: (a, b) => compareText(a.contract_code, b.contract_code),
-      render: (_, record) => <Link to={`/contracts/${record.id}`}>{record.contract_code}</Link>,
+      render: (_, record) => (
+        <Link to={`/contracts/${record.id}`} className="table-link-ellipsis" title={record.contract_code}>
+          {record.contract_code}
+        </Link>
+      ),
     },
     {
       title: '合同名称',
       dataIndex: 'contract_name',
+      width: 360,
       ellipsis: true,
       sorter: (a, b) => compareText(a.contract_name, b.contract_name),
       render: (value: string, record) => (
@@ -168,11 +174,15 @@ const ContractsPage = () => {
     {
       title: '关联项目',
       dataIndex: 'project_id',
-      width: 200,
+      width: 240,
       responsive: ['lg'],
       ellipsis: true,
       sorter: (a, b) => compareText(projectNameMap.get(a.project_id), projectNameMap.get(b.project_id)),
-      render: (value: number) => projectNameMap.get(value) || '-',
+      render: (value: number) => (
+        <span className="table-link-ellipsis" title={projectNameMap.get(value) || '-'}>
+          {projectNameMap.get(value) || '-'}
+        </span>
+      ),
     },
     {
       title: '合同状态',
@@ -267,7 +277,8 @@ const ContractsPage = () => {
           columns={columns}
           loading={loading}
           size={isMobile ? 'small' : 'middle'}
-          scroll={{ x: isMobile ? 760 : 1200 }}
+          tableLayout="fixed"
+          scroll={{ x: isMobile ? 760 : 1380 }}
           expandable={expandable}
         />
       </div>
