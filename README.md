@@ -192,37 +192,167 @@ SQLITE_DB_PATH=.local/project-manage.db
 ## 目录结构（核心）
 
 ```text
-backend/
-  app/
-    main.py
-    database.py
-    models.py
-    schemas.py
-    routers/
-    services/
-  tests/
-  Dockerfile
-frontend/
-  src/
-    api/
-    constants/
-    hooks/
-    layouts/
-    pages/
-    services/
-    types/
-  tests/
-  Dockerfile
-  nginx.conf
-  package.json
-docs/
-.github/
-  workflows/
-    ci.yml
-docker-compose.yml
-requirements.txt
-.env.example
+.
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── routers/
+│   │   └── services/
+│   ├── tests/
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   ├── constants/
+│   │   ├── hooks/
+│   │   ├── layouts/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── types/
+│   │   ├── App.tsx
+│   │   └── main.tsx
+│   ├── tests/
+│   ├── index.html
+│   ├── nginx.conf
+│   ├── package.json
+│   ├── playwright.config.ts
+│   └── vite.config.ts
+├── docs/
+├── scripts/
+├── .github/
+│   └── workflows/
+├── docker-compose.yml
+├── pytest.ini
+├── requirements.txt
+└── .env.example
 ```
+
+### 根目录
+
+- `backend/`
+  后端源码、接口、数据模型、测试和镜像构建文件都在这里。
+- `frontend/`
+  前端页面、样式、接口封装、自动化测试和前端构建配置都在这里。
+- `docs/`
+  补充文档目录，放运行说明、接口文档、测试报告、安全清理记录等。
+- `scripts/`
+  工程辅助脚本目录，当前主要放联调用和测试用脚本。
+- `.github/workflows/`
+  CI 配置目录，GitHub Actions 会从这里读取自动构建和自动测试流程。
+- `docker-compose.yml`
+  一键拉起前后端容器的编排文件，适合本地快速验证完整环境。
+- `pytest.ini`
+  后端 `pytest` 的统一配置入口。
+- `requirements.txt`
+  后端 Python 依赖清单。
+- `.env.example`
+  环境变量模板，给出本地需要配置的最小变量集合。
+
+### `backend/`
+
+- `backend/app/main.py`
+  FastAPI 应用入口。负责注册所有路由、中间件、异常处理和跨域配置。
+- `backend/app/database.py`
+  数据库层入口。负责创建 SQLAlchemy `engine`、`SessionLocal`、`Base`，并从环境变量读取 SQLite 路径。
+- `backend/app/models.py`
+  ORM 模型定义。这里决定数据库里有哪些表、表之间怎么关联。
+- `backend/app/schemas.py`
+  接口输入输出模型。主要负责请求校验和响应结构序列化。
+- `backend/app/routers/`
+  业务接口目录。每个文件对应一块明确的业务域：
+  - `projects.py`：项目台账
+  - `contracts.py`：合同与合同子表
+  - `payments.py`：全局付款记录
+  - `dashboard.py`：统计分析和仪表盘
+  - `imports.py`：Excel / AI 导入
+  - `exports.py`：Excel 导出
+- `backend/app/services/`
+  后端服务层。当前主要是 `ai_parser.py`，用于封装截图识别逻辑，不把第三方 AI 调用直接堆进路由。
+- `backend/tests/`
+  后端测试目录。放 `pytest` 用例和测试夹具，主要用于接口级烟测和核心业务流程验证。
+- `backend/Dockerfile`
+  后端镜像构建文件。
+
+### `frontend/`
+
+- `frontend/src/main.tsx`
+  React 挂载入口。
+- `frontend/src/App.tsx`
+  页面路由入口，定义整个前端有哪些主页面。
+- `frontend/src/api/`
+  HTTP 客户端和请求基础配置目录。当前主要是 Axios 实例和前后端地址识别逻辑。
+- `frontend/src/constants/`
+  业务常量目录。统一维护项目、合同、付款状态和颜色映射。
+- `frontend/src/hooks/`
+  自定义 Hook 目录。当前主要是移动端判断等通用能力。
+- `frontend/src/layouts/`
+  页面壳层目录。负责侧边栏、页头、整体布局结构。
+- `frontend/src/pages/`
+  页面目录。一个页面文件对应一个业务板块或详情页。
+- `frontend/src/services/`
+  前端接口封装目录。页面通过这里访问后端，不直接手写请求 URL。
+- `frontend/src/types/`
+  TypeScript 类型目录。用于约束前后端数据结构。
+- `frontend/src/styles.css`
+  全局样式和跨页面公共样式。
+- `frontend/tests/`
+  Playwright 自动化测试目录，覆盖烟测和关键创建流程。
+- `frontend/index.html`
+  Vite 入口 HTML 模板。
+- `frontend/nginx.conf`
+  生产环境静态资源托管和 `/api` 反向代理配置。
+- `frontend/package.json`
+  前端依赖和脚本入口。
+- `frontend/playwright.config.ts`
+  Playwright 自动化测试配置。
+- `frontend/vite.config.ts`
+  Vite 构建和开发服务器配置。
+- `frontend/Dockerfile`
+  前端镜像构建文件。
+
+### `docs/`
+
+- `runtime-and-lan.md`
+  前后端启动方式、沙箱和系统级环境的关系、局域网访问方法。
+- `frontend-backend-api.md`
+  前后端接口文档，按真实调用关系整理。
+- `test-report-2026-03-29.md`
+  当前阶段的测试记录和覆盖范围。
+- `git-security-cleanup-summary.md`
+  Git 历史清理、敏感数据移除和仓库瘦身记录。
+- `docker-hot-reload.md`
+  Docker 热更新相关说明。
+- `screenshots/`
+  README 或文档里引用的截图资源目录。
+
+### `scripts/`
+
+- `run-backend-e2e.sh`
+  前端自动化测试配套的后端启动脚本，用于把 Playwright 和后端服务联起来跑。
+
+### 本地产物与非核心目录
+
+下面这些目录经常会出现在工作区里，但它们不是项目源码主体：
+
+- `.local/`
+  本地运行时数据目录。当前推荐把 SQLite 数据库放这里，例如 `.local/project-manage.db`。
+- `.venv/`、`.venv312/`
+  本地 Python 虚拟环境目录，只服务当前机器的开发和测试。
+- `frontend/node_modules/`
+  前端依赖安装目录，由 `npm install` 生成。
+- `frontend/dist/`
+  前端构建产物目录，由 `npm run build` 生成。
+- `frontend/test-results/`
+  Playwright 测试结果目录。
+- `.pytest_cache/`
+  `pytest` 运行缓存。
+- `.vscode/`
+  本地编辑器配置。
+
+这些目录要么是运行时数据，要么是构建 / 测试产物，原则上都不应该当成源码结构来理解。
 
 ## 部署文件说明
 
