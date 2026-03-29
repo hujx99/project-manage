@@ -101,7 +101,95 @@ SQLITE_DB_PATH=.local/project-manage.db
 - [Git 安全清理与仓库瘦身记录](docs/git-security-cleanup-summary.md)
 - [测试报告（2026-03-29）](docs/test-report-2026-03-29.md)
 
-## 目录结构
+## 项目结构说明
+
+这个项目不是一组彼此独立的页面，而是一条完整业务链：
+
+1. `项目立项`
+   先建立项目台账，维护项目编号、名称、预算、负责人、阶段。
+2. `合同执行`
+   合同必须挂在项目下面，负责维护合同金额、供应商、标的清单、付款计划、变更记录。
+3. `付款跟踪`
+   付款记录挂在合同下面，用来统一跟踪计划金额、实际金额、待付款和当前状态。
+4. `业务总览`
+   从项目、合同、付款三个阶段汇总数据，做执行分析和风险提示。
+5. `数据导入 / 导出`
+   负责把 Excel、截图识别结果导入系统，或把现有业务数据导出。
+
+从数据关系上看：
+
+- 一个 `Project` 可以有多个 `Contract`
+- 一个 `Contract` 可以有多个 `ContractItem`
+- 一个 `Contract` 可以有多个 `Payment`
+- 一个 `Contract` 可以有多个 `ContractChange`
+
+## 代码结构
+
+### 后端
+
+- `backend/app/main.py`
+  FastAPI 应用入口，负责路由注册、异常处理、CORS 等启动配置。
+- `backend/app/database.py`
+  数据库连接、`Session` 和 `Base` 定义；SQLite 路径通过 `.env` 中的 `SQLITE_DB_PATH` 配置。
+- `backend/app/models.py`
+  SQLAlchemy ORM 模型，定义项目、合同、付款、标的、变更之间的表结构和关联关系。
+- `backend/app/schemas.py`
+  Pydantic 请求/响应模型，用来约束接口入参和返回格式。
+- `backend/app/routers/`
+  按业务域拆分接口：
+  - `projects.py`：项目列表、详情、增删改、删除保护
+  - `contracts.py`：合同主表及标的、变更、付款子表管理
+  - `payments.py`：全局付款记录增删改查和待付款重算
+  - `dashboard.py`：仪表盘统计、漏斗、风险分析
+  - `imports.py`：Excel 模板、Excel 导入、截图识别导入
+  - `exports.py`：项目 / 合同 / 付款导出
+- `backend/app/services/ai_parser.py`
+  调用 AI 服务解析截图，把识别结果整理成合同、标的、付款计划、变更记录。
+- `backend/tests/`
+  后端 `pytest` 用例，当前主要覆盖接口级烟测和核心业务链路。
+
+### 前端
+
+- `frontend/src/main.tsx`
+  前端应用入口，挂载 React 应用和 Ant Design 上下文。
+- `frontend/src/App.tsx`
+  路由入口，定义 `/`、`/projects`、`/contracts`、`/payments`、`/imports` 等页面。
+- `frontend/src/layouts/MainLayout.tsx`
+  系统壳层，负责侧边栏、页头、移动端抽屉导航。
+- `frontend/src/pages/`
+  页面层，按业务模块拆分：
+  - `Dashboard.tsx`：分析型仪表盘
+  - `ProjectsPage.tsx`：项目列表和立项台账
+  - `ProjectDetailPage.tsx`：单项目下的合同和付款汇总
+  - `ContractsPage.tsx`：合同列表
+  - `ContractDetailPage.tsx`：合同详情、标的、付款计划、变更记录
+  - `PaymentsPage.tsx`：全局付款待办池
+  - `ImportsPage.tsx`：Excel / 截图导入
+- `frontend/src/services/`
+  按业务模块封装接口请求，页面不直接拼 URL。
+- `frontend/src/api/client.ts`
+  Axios 客户端和接口基址判断逻辑，兼容本机和局域网访问。
+- `frontend/src/types/`
+  前端共享类型定义，对齐后端返回结构。
+- `frontend/src/constants/business.ts`
+  项目、合同、付款的状态口径和颜色映射。
+- `frontend/src/styles.css`
+  全局样式和各页面公共布局样式。
+- `frontend/tests/`
+  Playwright 前端自动化测试，覆盖烟测和创建流程。
+
+### 工程与文档
+
+- `.github/workflows/ci.yml`
+  CI 自动执行后端测试、前端构建和前端自动化烟测。
+- `docs/`
+  运行方式、接口、测试、安全清理等补充文档。
+- `docker-compose.yml`
+  一键拉起前后端容器。
+- `.env.example`
+  本地环境变量模板，不提交真实密钥和真实数据库路径。
+
+## 目录结构（核心）
 
 ```text
 backend/
@@ -112,19 +200,28 @@ backend/
     schemas.py
     routers/
     services/
+  tests/
   Dockerfile
-  data.db
 frontend/
   src/
     api/
+    constants/
+    hooks/
     layouts/
     pages/
     services/
+    types/
+  tests/
   Dockerfile
   nginx.conf
+  package.json
+docs/
+.github/
+  workflows/
+    ci.yml
 docker-compose.yml
 requirements.txt
-requirements-v2.md
+.env.example
 ```
 
 ## 部署文件说明
