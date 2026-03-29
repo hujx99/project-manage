@@ -286,7 +286,7 @@ const PaymentsPage = () => {
         onOk={() => void handleCreate()}
         confirmLoading={submitting}
         width={isMobile ? 'calc(100vw - 24px)' : undefined}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form layout="vertical" form={form}>
           <Form.Item label="项目" name="project_id">

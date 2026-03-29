@@ -66,14 +66,16 @@ test.describe('Contracts Page Smoke', () => {
       (response) => response.url().includes('/api/projects?page=1&page_size=100') && response.ok(),
     );
 
+    const dataRows = page.locator('.ant-table-tbody > tr:not(.ant-table-measure-row)');
+
     await expect(page.getByRole('heading', { name: '合同执行', exact: true })).toBeVisible();
     await expect(page.getByText('按项目筛选')).toBeVisible();
-    await expect(page.locator('.ant-table-tbody tr').first()).toBeVisible();
+    await expect(dataRows.first()).toBeVisible();
 
     const tableLayout = await page.locator('.ant-table table').evaluate((element) => getComputedStyle(element).tableLayout);
     expect(tableLayout).toBe('fixed');
 
-    const codeLink = page.locator('.ant-table-tbody tr').first().locator('a').first();
+    const codeLink = dataRows.first().locator('a').first();
     await expect(codeLink).toBeVisible();
 
     const codeStyles = await codeLink.evaluate((element) => {
@@ -103,9 +105,10 @@ test.describe('Contracts Page Smoke', () => {
 
     await page.goto('/contracts');
     await page.waitForResponse((response) => response.url().includes('/api/contracts') && response.ok());
+    const dataRows = page.locator('.ant-table-tbody > tr:not(.ant-table-measure-row)');
     await expect(page.getByRole('heading', { name: '合同执行', exact: true })).toBeVisible();
 
-    const firstRow = page.locator('.ant-table-tbody tr').first();
+    const firstRow = dataRows.first();
     await expect(firstRow.locator('.table-cell-subtitle').first()).toBeVisible();
     await expect(firstRow.locator('.table-cell-meta').first()).toBeVisible();
 

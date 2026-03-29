@@ -699,7 +699,7 @@ const ProjectsPage = () => {
         onOk={() => void handleSubmit()}
         confirmLoading={submitting}
         width={isMobile ? 'calc(100vw - 24px)' : undefined}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form layout="vertical" form={form}>
           <Form.Item label={T.formCode} name="project_code" rules={[{ required: true, message: T.validateCode }]}>

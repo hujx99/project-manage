@@ -290,7 +290,7 @@ const ContractsPage = () => {
         onOk={() => void handleCreate()}
         confirmLoading={submitting}
         width={isMobile ? 'calc(100vw - 24px)' : 720}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form layout="vertical" form={form}>
           <Form.Item label="所属项目" name="project_id" rules={[{ required: true, message: '请选择所属项目' }]}>
