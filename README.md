@@ -99,6 +99,7 @@ SQLITE_DB_PATH=.local/project-manage.db
 - [运行方式、沙箱与局域网访问说明](docs/runtime-and-lan.md)
 - [前后端接口文档](docs/frontend-backend-api.md)
 - [Git 安全清理与仓库瘦身记录](docs/git-security-cleanup-summary.md)
+- [测试报告（2026-03-29）](docs/test-report-2026-03-29.md)
 
 ## 目录结构
 
