@@ -12,7 +12,7 @@ import {
 } from '../constants/business';
 import useIsMobile from '../hooks/useIsMobile';
 import { createContract, fetchContracts } from '../services/contracts';
-import { fetchProjects } from '../services/projects';
+import { fetchAllProjects } from '../services/projects';
 import type { Contract, Payment, Project } from '../types';
 
 function compareText(a?: string | null, b?: string | null) {
@@ -37,15 +37,26 @@ const ContractsPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
 
+  const scheduleFormSetup = (callback: () => void) => {
+    if (typeof window === 'undefined') {
+      callback();
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      callback();
+    });
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [contractList, projectResult] = await Promise.all([
+      const [contractList, projectList] = await Promise.all([
         fetchContracts(),
-        fetchProjects({ page: 1, page_size: 100 }),
+        fetchAllProjects(),
       ]);
       setContracts(contractList);
-      setProjects(projectResult.items);
+      setProjects(projectList);
     } catch (error) {
       message.error((error as Error).message);
     } finally {
@@ -262,8 +273,11 @@ const ContractsPage = () => {
             <Button
               type="primary"
               onClick={() => {
-                form.resetFields();
                 setModalOpen(true);
+                scheduleFormSetup(() => {
+                  form.resetFields();
+                  form.setFieldsValue({ status: '签订', payment_direction: '支出' });
+                });
               }}
             >
               新建合同

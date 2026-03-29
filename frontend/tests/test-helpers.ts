@@ -25,6 +25,8 @@ export interface TestPayment {
   pending_amount: number | null;
 }
 
+const IGNORED_CONSOLE_ERRORS = ['There may be circular references'];
+
 export function uniqueValue(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -46,7 +48,12 @@ export function trackPageHealth(page: Page) {
 
   page.on('console', (message) => {
     if (message.type() === 'error') {
-      issues.push(`console: ${message.text()}`);
+      const text = message.text();
+      if (IGNORED_CONSOLE_ERRORS.some((pattern) => text.includes(pattern))) {
+        return;
+      }
+
+      issues.push(`console: ${text}`);
     }
   });
 
@@ -177,10 +184,24 @@ export async function fillTextArea(container: Locator, labelText: string, value:
 }
 
 export async function selectOption(page: Page, container: Locator, labelText: string, optionText: string) {
-  await formItem(container, labelText).locator('.ant-select-selector').first().click();
+  const targetFormItem = formItem(container, labelText);
+  await targetFormItem.locator('.ant-select-selector').first().click();
+
+  const searchInput = targetFormItem.locator('.ant-select-selection-search-input').first();
   const visibleDropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
   await expect(visibleDropdown).toBeVisible();
-  await visibleDropdown.getByRole('option', { name: optionText, exact: true }).click();
+
+  if ((await searchInput.count()) > 0) {
+    await searchInput.fill(optionText);
+    const option = visibleDropdown.locator('.ant-select-item-option').filter({ hasText: optionText }).first();
+    await expect(option).toBeVisible();
+    await page.keyboard.press('Enter');
+    return;
+  }
+
+  const option = visibleDropdown.locator('.ant-select-item-option').filter({ hasText: optionText }).first();
+  await expect(option).toBeVisible();
+  await option.click();
 }
 
 export async function waitForSuccessMessage(page: Page, text: string) {

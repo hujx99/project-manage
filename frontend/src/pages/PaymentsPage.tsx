@@ -7,7 +7,7 @@ import { PAYMENT_STATUSES, getPaymentStatusColor, normalizePaymentStatus } from 
 import useIsMobile from '../hooks/useIsMobile';
 import { createPayment, deletePayment, fetchPayments, updatePayment } from '../services/payments';
 import { fetchContracts } from '../services/contracts';
-import { fetchProjects } from '../services/projects';
+import { fetchAllProjects } from '../services/projects';
 import type { Contract, Payment, Project } from '../types';
 
 interface PaymentRow extends Payment {
@@ -39,19 +39,30 @@ const PaymentsPage = () => {
   const [form] = Form.useForm();
   const selectedProjectId = Form.useWatch('project_id', form);
 
+  const scheduleFormSetup = (callback: () => void) => {
+    if (typeof window === 'undefined') {
+      callback();
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      callback();
+    });
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [paymentList, projectResult, contractList] = await Promise.all([
+      const [paymentList, projectList, contractList] = await Promise.all([
         fetchPayments(),
-        fetchProjects({ page: 1, page_size: 100 }),
+        fetchAllProjects(),
         fetchContracts(),
       ]);
 
-      const projectMap = new Map(projectResult.items.map((item) => [item.id, item]));
+      const projectMap = new Map(projectList.map((item) => [item.id, item]));
       const contractMap = new Map(contractList.map((item) => [item.id, item]));
 
-      setProjects(projectResult.items);
+      setProjects(projectList);
       setContracts(contractList);
       setPayments(
         paymentList.map((item) => {
@@ -260,8 +271,11 @@ const PaymentsPage = () => {
             <Button
               type="primary"
               onClick={() => {
-                form.resetFields();
                 setModalOpen(true);
+                scheduleFormSetup(() => {
+                  form.resetFields();
+                  form.setFieldsValue({ payment_status: '未付', seq: 1 });
+                });
               }}
             >
               新建付款

@@ -199,6 +199,17 @@ const ProjectsPage = () => {
   const [draftSettings, setDraftSettings] = useState<ProjectListSettings>(readProjectListSettings);
   const [form] = Form.useForm();
 
+  const scheduleFormSetup = (callback: () => void) => {
+    if (typeof window === 'undefined') {
+      callback();
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      callback();
+    });
+  };
+
   const loadProjects = async () => {
     setLoading(true);
     try {
@@ -247,17 +258,22 @@ const ProjectsPage = () => {
 
   const openCreateModal = () => {
     setEditing(null);
-    form.resetFields();
     setModalOpen(true);
+    scheduleFormSetup(() => {
+      form.resetFields();
+      form.setFieldsValue({ status: '立项' });
+    });
   };
 
   const openEditModal = (record: Project) => {
     setEditing(record);
-    form.setFieldsValue({
-      ...record,
-      start_date: record.start_date ? dayjs(record.start_date) : undefined,
-    });
     setModalOpen(true);
+    scheduleFormSetup(() => {
+      form.setFieldsValue({
+        ...record,
+        start_date: record.start_date ? dayjs(record.start_date) : undefined,
+      });
+    });
   };
 
   const handleSubmit = async () => {
