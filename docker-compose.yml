@@ -1,16 +1,39 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: project-manage-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-project_manage}
+      POSTGRES_USER: ${POSTGRES_USER:-project_manage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-project_manage}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-project_manage} -d ${POSTGRES_DB:-project_manage}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     container_name: project-manage-backend
     restart: unless-stopped
-    env_file:
-      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql+psycopg2://project_manage:project_manage@postgres:5432/project_manage}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app/backend
+      - ./.local:/app/.local
 
   frontend:
     build:
@@ -22,3 +45,6 @@ services:
       - backend
     ports:
       - "80:80"
+
+volumes:
+  postgres_data:
