@@ -36,14 +36,14 @@ router = APIRouter(prefix="/api/import", tags=["导入"])
 ENTITY_CONFIG: dict[str, dict[str, Any]] = {
     "projects": {
         "headers": [
-            ("项目编号", "project_code"),
-            ("项目名称", "project_name"),
-            ("项目属性", "project_type"),
-            ("立项日期", "start_date"),
-            ("项目状态", "status"),
-            ("项目金额", "budget"),
-            ("负责人", "manager"),
-            ("备注", "remark"),
+            (["项目编号"], "project_code"),
+            (["项目名称"], "project_name"),
+            (["项目属性", "项目类型"], "project_type"),
+            (["立项日期", "申请日期"], "start_date"),
+            (["项目状态", "是否作废"], "status"),
+            (["项目金额", "预计项目金额"], "budget"),
+            (["负责人", "项目负责人"], "manager"),
+            (["备注"], "remark"),
         ],
         "example": {
             "project_code": "WLGS202400076",
@@ -55,28 +55,28 @@ ENTITY_CONFIG: dict[str, dict[str, Any]] = {
             "manager": "张三",
             "remark": "示例备注",
         },
-        "required": ["project_code", "project_name", "status"],
+        "required": ["project_code", "project_name"],
     },
     "contracts": {
         "headers": [
-            ("项目编号", "project_code"),
-            ("合同编号", "contract_code"),
-            ("合同名称", "contract_name"),
-            ("采购类型", "procurement_type"),
-            ("费用归属责任中心", "cost_department"),
-            ("供应商", "vendor"),
-            ("合同金额", "amount"),
-            ("合同金额（变更前）", "amount_before_change"),
-            ("签订日期", "sign_date"),
-            ("备案日期", "filing_date"),
-            ("开始执行日期", "start_date"),
-            ("结束执行日期", "end_date"),
-            ("主合同编号", "parent_contract_code"),
-            ("合同续签类型", "renewal_type"),
-            ("收支方向", "payment_direction"),
-            ("合同状态", "status"),
-            ("备案文件", "filing_reference"),
-            ("备注", "remark"),
+            (["项目编号"], "project_code"),
+            (["合同编号"], "contract_code"),
+            (["合同名称"], "contract_name"),
+            (["采购类型"], "procurement_type"),
+            (["费用归属责任中心"], "cost_department"),
+            (["供应商"], "vendor"),
+            (["合同金额"], "amount"),
+            (["合同金额（变更前）"], "amount_before_change"),
+            (["签订日期"], "sign_date"),
+            (["备案日期"], "filing_date"),
+            (["开始执行日期"], "start_date"),
+            (["结束执行日期"], "end_date"),
+            (["主合同编号"], "parent_contract_code"),
+            (["合同续签类型"], "renewal_type"),
+            (["收支方向"], "payment_direction"),
+            (["合同状态"], "status"),
+            (["备案文件"], "filing_reference"),
+            (["备注"], "remark"),
         ],
         "example": {
             "project_code": "WLGS202400076",
@@ -102,16 +102,16 @@ ENTITY_CONFIG: dict[str, dict[str, Any]] = {
     },
     "payments": {
         "headers": [
-            ("合同编号", "contract_code"),
-            ("序号", "seq"),
-            ("付款阶段", "phase"),
-            ("计划日期", "planned_date"),
-            ("计划金额", "planned_amount"),
-            ("实际日期", "actual_date"),
-            ("实际金额", "actual_amount"),
-            ("付款状态", "payment_status"),
-            ("支付说明", "description"),
-            ("备注", "remark"),
+            (["合同编号"], "contract_code"),
+            (["序号"], "seq"),
+            (["付款阶段"], "phase"),
+            (["计划日期"], "planned_date"),
+            (["计划金额"], "planned_amount"),
+            (["实际日期"], "actual_date"),
+            (["实际金额"], "actual_amount"),
+            (["付款状态"], "payment_status"),
+            (["支付说明"], "description"),
+            (["备注"], "remark"),
         ],
         "example": {
             "contract_code": "WLGS202500056CG20260005",
@@ -130,7 +130,7 @@ ENTITY_CONFIG: dict[str, dict[str, Any]] = {
 }
 
 
-# 下面几个工具函数负责把 Excel / AI 返回的“弱类型文本值”
+# 下面几个工具函数负责把 Excel / AI 返回的"弱类型文本值"
 # 统一转成数据库层需要的 Decimal / date / 业务字段。
 def _to_decimal(value: Any) -> Decimal | None:
     """将输入值转换为 Decimal。"""
@@ -150,15 +150,20 @@ def _build_pending_amount(planned_amount: Decimal | None, actual_amount: Decimal
 
 
 def _to_date(value: Any) -> date | None:
-    """将输入值转换为日期。"""
+    """将输入值转换为日期，兼容多种常见格式。"""
     if value in (None, ""):
         return None
+    if isinstance(value, datetime):
+        return value.date()
     if isinstance(value, date):
         return value
-    try:
-        return date.fromisoformat(str(value))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="日期字段格式应为 YYYY-MM-DD") from exc
+    s = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y年%m月%d日", "%m/%d/%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    raise HTTPException(status_code=400, detail=f"无法识别日期格式：{s}，建议使用 YYYY-MM-DD")
 
 
 def _normalize_project_info(contract_data: dict[str, Any]) -> tuple[str, str]:
@@ -216,7 +221,7 @@ def download_template(entity: str):
     workbook = Workbook()
     worksheet = workbook.active
     worksheet.title = "导入模板"
-    worksheet.append([title for title, _ in config["headers"]])
+    worksheet.append([titles[0] for titles, _ in config["headers"]])
     worksheet.append([config["example"].get(field, "") for _, field in config["headers"]])
 
     buffer = BytesIO()
@@ -256,17 +261,32 @@ async def import_excel(
 
     headers = [str(value).strip() if value is not None else "" for value in rows[0]]
     header_index = {header: index for index, header in enumerate(headers)}
-    missing_headers = [title for title, _ in config["headers"] if title not in header_index]
-    if missing_headers:
-        raise HTTPException(status_code=400, detail=f"缺少列：{', '.join(missing_headers)}")
 
-    # 结果按“成功 / 失败 / 跳过”累计，前端可以直接把它展示成导入报告。
+    # 每个字段取第一个能匹配上的列名；必填字段匹配不上才报错，可选字段缺失则置 None。
+    field_col: dict[str, int] = {}
+    required_fields = set(config["required"])
+    missing_required: list[str] = []
+    for titles, field in config["headers"]:
+        matched = next((t for t in titles if t in header_index), None)
+        if matched:
+            field_col[field] = header_index[matched]
+        elif field in required_fields:
+            missing_required.append(titles[0])
+    if missing_required:
+        raise HTTPException(status_code=400, detail=f"缺少必填列：{', '.join(missing_required)}")
+
+    # 结果按"成功 / 失败 / 跳过"累计，前端可以直接把它展示成导入报告。
     result = {"success": 0, "failed": 0, "skipped": 0, "errors": []}
 
     for row_number, row in enumerate(rows[1:], start=2):
         row_data: dict[str, Any] = {}
-        for zh_name, field in config["headers"]:
-            row_data[field] = row[header_index.get(zh_name, -1)] if zh_name in header_index else None
+        for _, field in config["headers"]:
+            idx = field_col.get(field)
+            row_data[field] = row[idx] if idx is not None else None
+
+        # "是否作废"列的值兼容：是→作废，否→立项，其余原样保留。
+        if "status" in row_data and row_data["status"] in ("是", "否"):
+            row_data["status"] = "作废" if row_data["status"] == "是" else "立项"
 
         if all(value in (None, "") for value in row_data.values()):
             continue
@@ -285,7 +305,7 @@ async def import_excel(
                     "project_name": str(row_data["project_name"]).strip(),
                     "project_type": row_data.get("project_type"),
                     "start_date": _to_date(row_data.get("start_date")),
-                    "status": str(row_data["status"]).strip(),
+                    "status": str(row_data["status"]).strip() if row_data.get("status") else "立项",
                     "budget": _to_decimal(row_data.get("budget")),
                     "manager": row_data.get("manager"),
                     "remark": row_data.get("remark"),
@@ -339,7 +359,7 @@ async def import_excel(
                     db.add(models.Contract(**payload))
 
             else:
-                # 付款以“合同 + 序号”识别重复记录；没有序号时只能新增。
+                # 付款以"合同 + 序号"识别重复记录；没有序号时只能新增。
                 contract_code = str(row_data["contract_code"]).strip()
                 contract = db.query(models.Contract).filter(models.Contract.contract_code == contract_code).first()
                 if not contract:
@@ -439,7 +459,7 @@ def confirm_screenshot_import(payload: schemas.AIScreenshotConfirmRequest, db: S
     if _to_decimal(contract_data.get("amount")) is None:
         raise HTTPException(status_code=400, detail="合同金额不能为空")
 
-    # 截图识别导入采用“两段式提交”：
+    # 截图识别导入采用"两段式提交"：
     # 1. screenshot 接口只返回识别结果
     # 2. confirm 接口在人工确认后一次性创建项目 / 合同 / 子表
     existing_contract = db.query(models.Contract).filter(models.Contract.contract_code == contract_code).first()
