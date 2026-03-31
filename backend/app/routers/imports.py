@@ -427,8 +427,15 @@ async def import_from_screenshot(files: list[UploadFile] = File(...)):
         raise HTTPException(status_code=400, detail="上传的截图内容为空")
 
     try:
-        # 这里只做识别，不做数据库写入。真正落库放在 confirm 接口，避免 AI 误识别直接污染数据。
-        parsed_data, uncertain_fields = parse_screenshots(images_b64)
+        from .settings import _load as _load_settings
+        ai_cfg = _load_settings().get("ai", {})
+        parsed_data, uncertain_fields = parse_screenshots(
+            images_b64,
+            provider=ai_cfg.get("provider", "anthropic"),
+            api_key=ai_cfg.get("api_key", ""),
+            base_url=ai_cfg.get("base_url", ""),
+            model=ai_cfg.get("model", ""),
+        )
     except AIParserError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001

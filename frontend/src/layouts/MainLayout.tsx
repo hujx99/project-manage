@@ -5,6 +5,7 @@ import {
   FileTextOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  SettingOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
 import { Button, Drawer, Layout, Menu, Typography } from 'antd';
@@ -20,6 +21,7 @@ const TEXT = {
   contracts: '\u5408\u540c\u6267\u884c',
   payments: '\u4ed8\u6b3e\u8ddf\u8e2a',
   imports: '\u6279\u91cf\u5bfc\u5165',
+  settings: '\u7cfb\u7edf\u8bbe\u7f6e',
   brandTitle: '\u9879\u76ee\u4e1a\u52a1\u53f0\u8d26',
   brandSubtitle: '\u6309\u6d41\u7a0b\u7ba1\u9879\u76ee\u3001\u5408\u540c\u548c\u4ed8\u6b3e',
   headerTitle: '\u9879\u76ee\u7acb\u9879 / \u5408\u540c\u6267\u884c / \u4ed8\u6b3e\u8ddf\u8e2a',
@@ -32,6 +34,7 @@ const menuItems = [
   { key: '/contracts', icon: <FileTextOutlined />, label: <Link to="/contracts">{TEXT.contracts}</Link> },
   { key: '/payments', icon: <DollarCircleOutlined />, label: <Link to="/payments">{TEXT.payments}</Link> },
   { key: '/imports', icon: <UploadOutlined />, label: <Link to="/imports">{TEXT.imports}</Link> },
+  { key: '/settings', icon: <SettingOutlined />, label: <Link to="/settings">{TEXT.settings}</Link> },
 ];
 
 function getSelectedKey(pathname: string) {

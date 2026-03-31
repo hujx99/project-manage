@@ -7,6 +7,7 @@ import ImportsPage from './pages/ImportsPage';
 import PaymentsPage from './pages/PaymentsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
+import SettingsPage from './pages/SettingsPage';
 
 const App = () => (
   <Routes>
@@ -18,6 +19,7 @@ const App = () => (
       <Route path="contracts/:id" element={<ContractDetailPage />} />
       <Route path="payments" element={<PaymentsPage />} />
       <Route path="imports" element={<ImportsPage />} />
+      <Route path="settings" element={<SettingsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
   </Routes>
