@@ -1342,3 +1342,7 @@ body {
     flex-basis: 100%;
   }
 }
+
+.row-overdue td {
+  background-color: #fff2f0 !important;
+}

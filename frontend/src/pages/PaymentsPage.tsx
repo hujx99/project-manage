@@ -1,11 +1,12 @@
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../api/client';
 import { PAYMENT_STATUSES, getPaymentStatusColor, normalizePaymentStatus } from '../constants/business';
 import useIsMobile from '../hooks/useIsMobile';
-import { createPayment, deletePayment, fetchPayments, updatePayment } from '../services/payments';
+import { fetchPayments, updatePayment } from '../services/payments';
 import { fetchContracts } from '../services/contracts';
 import { fetchAllProjects } from '../services/projects';
 import type { Contract, Payment, Project } from '../types';
@@ -13,7 +14,10 @@ import type { Contract, Payment, Project } from '../types';
 interface PaymentRow extends Payment {
   project_code: string;
   project_name: string;
+  project_id: number;
   contract_name: string;
+  contract_id: number;
+  overdue: boolean;
 }
 
 function compareText(a?: string | null, b?: string | null) {
@@ -28,27 +32,14 @@ function compareDate(a?: string | null, b?: string | null) {
   return dayjs(a ?? undefined).valueOf() - dayjs(b ?? undefined).valueOf();
 }
 
+const today = dayjs().startOf('day');
+
 const PaymentsPage = () => {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [payments, setPayments] = useState<PaymentRow[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [form] = Form.useForm();
-  const selectedProjectId = Form.useWatch('project_id', form);
-
-  const scheduleFormSetup = (callback: () => void) => {
-    if (typeof window === 'undefined') {
-      callback();
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      callback();
-    });
-  };
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
 
   const loadData = async () => {
     setLoading(true);
@@ -59,20 +50,23 @@ const PaymentsPage = () => {
         fetchContracts(),
       ]);
 
-      const projectMap = new Map(projectList.map((item) => [item.id, item]));
-      const contractMap = new Map(contractList.map((item) => [item.id, item]));
+      const projectMap = new Map(projectList.map((item: Project) => [item.id, item]));
+      const contractMap = new Map(contractList.map((item: Contract) => [item.id, item]));
 
-      setProjects(projectList);
-      setContracts(contractList);
       setPayments(
-        paymentList.map((item) => {
+        paymentList.map((item: Payment) => {
           const contract = contractMap.get(item.contract_id);
           const project = contract ? projectMap.get(contract.project_id) : undefined;
+          const isUnpaid = item.payment_status !== '已付款';
+          const isPastDue = item.planned_date ? dayjs(item.planned_date).isBefore(today) : false;
           return {
             ...item,
             project_code: project?.project_code ?? '-',
             project_name: project?.project_name ?? '-',
+            project_id: project?.id ?? 0,
             contract_name: contract?.contract_name ?? '-',
+            contract_id: contract?.id ?? 0,
+            overdue: isUnpaid && isPastDue,
           };
         }),
       );
@@ -86,48 +80,6 @@ const PaymentsPage = () => {
   useEffect(() => {
     void loadData();
   }, []);
-
-  const contractOptions = useMemo(
-    () => (selectedProjectId ? contracts.filter((item) => item.project_id === selectedProjectId) : contracts),
-    [contracts, selectedProjectId],
-  );
-
-  const handleCreate = async () => {
-    const values = await form.validateFields();
-    setSubmitting(true);
-    try {
-      await createPayment({
-        contract_id: values.contract_id,
-        seq: values.seq,
-        phase: values.phase,
-        planned_date: values.planned_date ? values.planned_date.format('YYYY-MM-DD') : undefined,
-        planned_amount: values.planned_amount,
-        actual_date: values.actual_date ? values.actual_date.format('YYYY-MM-DD') : undefined,
-        actual_amount: values.actual_amount,
-        payment_status: values.payment_status,
-        description: values.description,
-        remark: values.remark,
-      });
-      message.success('付款记录已创建');
-      setModalOpen(false);
-      form.resetFields();
-      void loadData();
-    } catch (error) {
-      message.error((error as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    try {
-      await deletePayment(id);
-      message.success('付款记录已删除');
-      void loadData();
-    } catch (error) {
-      message.error((error as Error).message);
-    }
-  };
 
   const handleMarkPaid = async (record: PaymentRow) => {
     try {
@@ -143,14 +95,14 @@ const PaymentsPage = () => {
     }
   };
 
+  const displayedPayments = useMemo(
+    () => (statusFilter ? payments.filter((p) => p.payment_status === statusFilter) : payments),
+    [payments, statusFilter],
+  );
+
+  const overdueCount = useMemo(() => payments.filter((p) => p.overdue).length, [payments]);
+
   const columns: ColumnsType<PaymentRow> = [
-    {
-      title: '项目编号',
-      dataIndex: 'project_code',
-      width: 160,
-      responsive: ['xl'],
-      sorter: (a, b) => compareText(a.project_code, b.project_code),
-    },
     {
       title: '项目名称',
       dataIndex: 'project_name',
@@ -170,6 +122,13 @@ const PaymentsPage = () => {
       ),
     },
     {
+      title: '项目编号',
+      dataIndex: 'project_code',
+      width: 160,
+      responsive: ['xl'],
+      sorter: (a, b) => compareText(a.project_code, b.project_code),
+    },
+    {
       title: '合同名称',
       dataIndex: 'contract_name',
       width: 200,
@@ -186,11 +145,16 @@ const PaymentsPage = () => {
       render: (value) => value || '-',
     },
     {
-      title: '付款日期',
+      title: '计划付款日',
       dataIndex: 'planned_date',
       width: 120,
       sorter: (a, b) => compareDate(a.planned_date, b.planned_date),
-      render: (value) => value || '-',
+      render: (value, record) => (
+        <span style={{ color: record.overdue ? '#ff4d4f' : undefined }}>
+          {value || '-'}
+          {record.overdue && ' ⚠'}
+        </span>
+      ),
     },
     {
       title: '合同付款金额',
@@ -224,14 +188,6 @@ const PaymentsPage = () => {
       ),
     },
     {
-      title: '备注',
-      dataIndex: 'remark',
-      width: 160,
-      responsive: ['xl'],
-      ellipsis: true,
-      render: (value) => value || '-',
-    },
-    {
       title: '操作',
       width: 160,
       fixed: isMobile ? undefined : 'right',
@@ -242,8 +198,11 @@ const PaymentsPage = () => {
               标记已付款
             </Button>
           )}
-          <Button type="link" danger onClick={() => void handleDelete(record.id)}>
-            删除
+          <Button
+            type="link"
+            onClick={() => navigate(`/contracts/${record.contract_id}`)}
+          >
+            查看合同
           </Button>
         </Space>
       ),
@@ -257,97 +216,44 @@ const PaymentsPage = () => {
           付款跟踪
         </Typography.Title>
         <Typography.Text type="secondary">
-          第三步：统一跟踪合同付款执行，集中处理未付、提报和已付款项。
+          统一跟踪所有合同付款执行情况，在合同详情页管理付款计划。
         </Typography.Text>
       </div>
 
       <div className="page-panel" style={{ padding: isMobile ? 16 : 20 }}>
         <div className="action-bar">
-          <div className="action-left" />
+          <Space wrap className="action-left">
+            <Select
+              allowClear
+              placeholder="筛选付款状态"
+              style={{ width: 160 }}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={PAYMENT_STATUSES.map((s) => ({ label: s, value: s }))}
+            />
+            {overdueCount > 0 && (
+              <Tag color="error" style={{ cursor: 'pointer' }} onClick={() => setStatusFilter(undefined)}>
+                逾期未付 {overdueCount} 笔
+              </Tag>
+            )}
+          </Space>
           <Space wrap className="action-right">
             <Button onClick={() => window.open(`${API_BASE_URL}/export/payments?format=xlsx`, '_blank')}>
               导出
-            </Button>
-            <Button
-              type="primary"
-              onClick={() => {
-                setModalOpen(true);
-                scheduleFormSetup(() => {
-                  form.resetFields();
-                  form.setFieldsValue({ payment_status: '未付', seq: 1 });
-                });
-              }}
-            >
-              新建付款
             </Button>
           </Space>
         </div>
 
         <Table
           rowKey="id"
-          dataSource={payments}
+          dataSource={displayedPayments}
           columns={columns}
           loading={loading}
           size={isMobile ? 'small' : 'middle'}
           scroll={{ x: isMobile ? 860 : 1600 }}
+          rowClassName={(record) => (record.overdue ? 'row-overdue' : '')}
         />
       </div>
-
-      <Modal
-        title="新建付款"
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        onOk={() => void handleCreate()}
-        confirmLoading={submitting}
-        width={isMobile ? 'calc(100vw - 24px)' : undefined}
-        destroyOnHidden
-      >
-        <Form layout="vertical" form={form}>
-          <Form.Item label="项目" name="project_id">
-            <Select
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              options={projects.map((item) => ({ label: item.project_name, value: item.id }))}
-              onChange={() => form.setFieldValue('contract_id', undefined)}
-            />
-          </Form.Item>
-          <Form.Item label="合同" name="contract_id" rules={[{ required: true, message: '请选择合同' }]}>
-            <Select
-              showSearch
-              optionFilterProp="label"
-              options={contractOptions.map((item) => ({ label: item.contract_name, value: item.id }))}
-            />
-          </Form.Item>
-          <Form.Item label="期次" name="seq">
-            <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="付款阶段" name="phase">
-            <Input />
-          </Form.Item>
-          <Form.Item label="计划日期" name="planned_date">
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="计划金额" name="planned_amount">
-            <InputNumber min={0} precision={2} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="实际日期" name="actual_date">
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="实际金额" name="actual_amount">
-            <InputNumber min={0} precision={2} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="付款状态" name="payment_status" rules={[{ required: true, message: '请选择付款状态' }]}>
-            <Select options={PAYMENT_STATUSES.map((item) => ({ label: item, value: item }))} />
-          </Form.Item>
-          <Form.Item label="支付说明" name="description">
-            <Input />
-          </Form.Item>
-          <Form.Item label="备注" name="remark">
-            <Input.TextArea rows={3} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 };
