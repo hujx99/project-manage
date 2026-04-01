@@ -194,7 +194,6 @@ const Dashboard = () => {
       strokeColor: '#2563eb',
       primary: formatMoneyCompact(financialHealth?.total_contract_amount ?? 0),
       secondary: `合同 ${formatMoney(financialHealth?.total_contract_amount ?? 0)} / 预算 ${formatMoney(financialHealth?.total_budget ?? 0)}`,
-      hint: '看预算是否已经真正进入执行。',
     },
     {
       title: '合同转已付',
@@ -203,7 +202,6 @@ const Dashboard = () => {
       strokeColor: '#16a34a',
       primary: formatMoneyCompact(financialHealth?.total_paid_amount ?? 0),
       secondary: `已付 ${formatMoney(financialHealth?.total_paid_amount ?? 0)} / 合同 ${formatMoney(financialHealth?.total_contract_amount ?? 0)}`,
-      hint: '看签约金额有多少已经落到付款结果。',
     },
     {
       title: '待付压力',
@@ -212,7 +210,6 @@ const Dashboard = () => {
       strokeColor: '#d97706',
       primary: formatMoneyCompact(financialHealth?.total_pending_amount ?? 0),
       secondary: `待付 ${formatMoney(financialHealth?.total_pending_amount ?? 0)} / 逾期 ${formatMoney(paymentRisk?.overdue_amount ?? 0)}`,
-      hint: '看未支付金额对当前合同池形成多大压力。',
     },
     {
       title: '项目结项率',
@@ -221,7 +218,6 @@ const Dashboard = () => {
       strokeColor: '#7c3aed',
       primary: `${closedProjectCount}`,
       secondary: `项目总数 ${funnel?.project_total ?? 0}`,
-      hint: '看项目组合里存量项目的闭环程度。',
     },
   ];
 
@@ -257,7 +253,8 @@ const Dashboard = () => {
       (analysis?.manager_load ?? []).map((item) => ({
         manager: shortenText(item.manager, 8),
         fullName: item.manager,
-        pending_total: item.pending_total,
+        budget_total: Number(item.budget_total ?? 0),
+        pending_total: Number(item.pending_total ?? 0),
         active_project_count: item.active_project_count,
         unlinked_project_count: item.unlinked_project_count,
       })),
@@ -280,26 +277,14 @@ const Dashboard = () => {
     <div className="detail-stack dashboard-stack">
       <div>
         <Typography.Title level={3} style={{ marginBottom: 4 }}>
-          经营分析仪表盘
+          业务总览
         </Typography.Title>
         <Typography.Text type="secondary">
-          首页不再只罗列总数，而是直接回答三个问题：业务卡在哪一段、资金压在哪一段、谁现在最需要被盯住。
+          最近刷新：{formatRefreshTime(lastUpdated)}{refreshing ? '　正在同步...' : ''}
         </Typography.Text>
       </div>
 
       <div className="page-panel dashboard-command">
-        <div className="dashboard-command-copy">
-          <span className="dashboard-command-kicker">分析视角</span>
-          <Typography.Title level={2} className="dashboard-command-title">
-          </Typography.Title>
-          <Typography.Paragraph className="dashboard-command-desc">
-          </Typography.Paragraph>
-          <div className="dashboard-command-meta">
-            <span>最近刷新：{formatRefreshTime(lastUpdated)}</span>
-            <span>{refreshing ? '正在同步最新数据...' : '实时轮询开启中'}</span>
-          </div>
-        </div>
-
         <div className="dashboard-command-grid">
           {headlineCards.map((item) => (
             <div key={item.label} className="dashboard-command-card">
@@ -324,8 +309,7 @@ const Dashboard = () => {
         <Alert
           type="error"
           showIcon
-          message={`当前有 ${paymentRisk?.overdue_count ?? 0} 笔付款已经逾期，逾期待付金额 ${formatMoney(paymentRisk?.overdue_amount ?? 0)}。`}
-          description="建议先处理逾期存量，再去看未来 7 天内的新到期事项；否则仪表盘的风险读数会持续恶化。"
+          message={`当前有 ${paymentRisk?.overdue_count ?? 0} 笔付款已经逾期，逾期待付金额 ${formatMoney(paymentRisk?.overdue_amount ?? 0)}，请尽快处理。`}
         />
       )}
 
@@ -348,7 +332,6 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <Progress percent={item.percent} strokeColor={item.strokeColor} trailColor="rgba(148, 163, 184, 0.2)" showInfo={false} />
-                <div className="dashboard-health-hint">{item.hint}</div>
               </>
             )}
           </Card>
@@ -415,9 +398,6 @@ const Dashboard = () => {
                 }}
                 height={isMobile ? 260 : 320}
               />
-              <div className="dashboard-chart-caption">
-                红色代表已经形成逾期，橙色代表短期内会继续转成催办压力。
-              </div>
             </>
           )}
         </Card>
@@ -477,25 +457,21 @@ const Dashboard = () => {
             <>
               <Bar
                 data={managerChartData}
-                xField="pending_total"
+                xField="budget_total"
                 yField="manager"
-                seriesField="manager"
                 legend={false}
                 color="#2563eb"
                 axis={{ x: { labelFormatter: (value: string) => `${Math.round(Number(value) / 10000)}万` } }}
                 tooltip={{
                   items: [
-                    (datum: { fullName: string; pending_total: number; active_project_count: number; unlinked_project_count: number }) => ({
+                    (datum: { fullName: string; budget_total: number; pending_total: number; active_project_count: number; unlinked_project_count: number }) => ({
                       name: datum.fullName,
-                      value: `${formatMoney(datum.pending_total)} / 活跃项目 ${datum.active_project_count} / 未落合同 ${datum.unlinked_project_count}`,
+                      value: `预算 ${formatMoney(datum.budget_total)} / 待付 ${formatMoney(datum.pending_total)} / 活跃项目 ${datum.active_project_count}`,
                     }),
                   ],
                 }}
                 height={isMobile ? 280 : 340}
               />
-              <div className="dashboard-chart-caption">
-                这里按“责任人名下待付金额”排序，便于先找真正需要协调的人。
-              </div>
             </>
           )}
         </Card>
@@ -509,7 +485,6 @@ const Dashboard = () => {
                 data={vendorChartData}
                 xField="amount_total"
                 yField="vendor"
-                seriesField="vendor"
                 legend={false}
                 color="#7c3aed"
                 axis={{ x: { labelFormatter: (value: string) => `${Math.round(Number(value) / 10000)}万` } }}
@@ -523,9 +498,6 @@ const Dashboard = () => {
                 }}
                 height={isMobile ? 280 : 340}
               />
-              <div className="dashboard-chart-caption">
-                金额集中度越高，越适合在付款、续签和风险管理上单独建立跟踪清单。
-              </div>
             </>
           )}
         </Card>
@@ -595,45 +567,6 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      <Card className="page-panel" title="当前分析结论">
-        {loading && !analysis ? (
-          <Skeleton active paragraph={{ rows: 4 }} />
-        ) : (
-          <div className="dashboard-rule-grid">
-            <div className="dashboard-rule-card">
-              <strong>项目侧</strong>
-              <span>
-                当前还有 {funnel?.projects_without_contracts ?? 0} 个项目未进入合同执行，项目到合同的衔接率是{' '}
-                {formatPercent(coverage?.project_contract_link_rate ?? 0)}。
-              </span>
-            </div>
-            <div className="dashboard-rule-card">
-              <strong>合同侧</strong>
-              <span>
-                {funnel?.contracts_without_payment_plans ?? 0} 份合同还没有拆付款计划，说明执行台账还没有完全传递到资金侧。
-              </span>
-            </div>
-            <div className="dashboard-rule-card">
-              <strong>付款侧</strong>
-              <span>
-                付款逾期率已到 {formatPercent(coverage?.payment_overdue_rate ?? 0)}，当前最大的管理重点不是新增统计，而是先消化逾期存量。
-              </span>
-            </div>
-            <div className="dashboard-rule-card">
-              <strong>责任侧</strong>
-              <span>责任人负载按待付金额排序，适合直接用于周例会或付款推进会的点名清单。</span>
-            </div>
-            <div className="dashboard-rule-card">
-              <strong>供应商侧</strong>
-              <span>供应商集中度图可以帮助判断付款和续签风险是否集中在少数合作方身上。</span>
-            </div>
-            <div className="dashboard-rule-card">
-              <strong>刷新机制</strong>
-              <span>仪表盘每 60 秒自动刷新一次，前后端开发模式启动后，你会直接看到修改后的实时状态。</span>
-            </div>
-          </div>
-        )}
-      </Card>
     </div>
   );
 };

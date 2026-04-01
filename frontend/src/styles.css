@@ -314,18 +314,11 @@ body {
 }
 
 .dashboard-command {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 1fr);
-  gap: 20px;
   padding: 26px;
   background:
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 34%),
     radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.12), transparent 32%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.95));
-}
-
-.dashboard-command-copy {
-  min-width: 0;
 }
 
 .dashboard-command-kicker {
@@ -361,7 +354,7 @@ body {
 
 .dashboard-command-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1108,31 +1101,13 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .dashboard-command,
+  .dashboard-command-grid,
   .dashboard-health-grid,
   .dashboard-funnel-grid,
   .dashboard-chart-grid-primary,
   .dashboard-chart-grid-secondary,
   .dashboard-insight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dashboard-hero,
-  .dashboard-flow-grid,
-  .dashboard-rule-grid,
-  .dashboard-secondary-grid,
-  .dashboard-metrics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dashboard-hero-side {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dashboard-command-copy {
-    grid-column: 1 / -1;
   }
 }
 
@@ -1262,7 +1237,6 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .dashboard-command,
   .dashboard-command-grid,
   .dashboard-health-grid,
   .dashboard-funnel-grid,

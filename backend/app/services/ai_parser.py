@@ -1,4 +1,4 @@
-"""Claude Vision 解析服务。"""
+"""AI Vision 解析服务，支持 Anthropic Claude 和 OpenAI 兼容协议（通义千问、豆包、DeepSeek 等）。"""
 
 from __future__ import annotations
 
@@ -6,12 +6,9 @@ import json
 import os
 from typing import Any
 
-from anthropic import Anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
-
-MODEL_NAME = "claude-sonnet-4-20250514"
 
 EXTRACTION_PROMPT = """
 你是一个合同信息提取助手。请从以下OA系统截图中提取合同信息，严格返回JSON格式：
@@ -75,48 +72,73 @@ def _extract_uncertain_fields(data: Any, prefix: str = "") -> list[str]:
     return paths
 
 
-def parse_screenshots(images_b64: list[str]) -> tuple[dict[str, Any], list[str]]:
-    """调用 Claude Vision 解析截图并返回结构化数据。"""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise AIParserError("未配置 ANTHROPIC_API_KEY")
-    if not images_b64:
-        raise AIParserError("至少需要一张截图")
-
-    client = Anthropic(api_key=api_key)
-    image_contents = [
-        {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/png",
-                "data": b64,
-            },
-        }
-        for b64 in images_b64
-    ]
-
-    response = client.messages.create(
-        model=MODEL_NAME,
-        max_tokens=4096,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    *image_contents,
-                    {"type": "text", "text": EXTRACTION_PROMPT},
-                ],
-            }
-        ],
-    )
-
-    raw_text = "\n".join(block.text for block in response.content if getattr(block, "text", None)).strip()
+def _parse_json_response(raw_text: str) -> dict[str, Any]:
+    raw_text = raw_text.strip()
     if raw_text.startswith("```"):
         raw_text = raw_text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     try:
-        parsed = json.loads(raw_text)
+        return json.loads(raw_text)
     except json.JSONDecodeError as exc:
         raise AIParserError("AI 返回内容不是合法 JSON") from exc
 
+
+def _parse_with_anthropic(images_b64: list[str], api_key: str, model: str) -> str:
+    from anthropic import Anthropic
+    client = Anthropic(api_key=api_key)
+    image_contents = [
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}
+        for b64 in images_b64
+    ]
+    response = client.messages.create(
+        model=model,
+        max_tokens=4096,
+        messages=[{"role": "user", "content": [*image_contents, {"type": "text", "text": EXTRACTION_PROMPT}]}],
+    )
+    return "\n".join(block.text for block in response.content if getattr(block, "text", None))
+
+
+def _parse_with_openai_compatible(images_b64: list[str], api_key: str, base_url: str, model: str) -> str:
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    image_contents: list[dict[str, Any]] = [
+        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}}
+        for b64 in images_b64
+    ]
+    response = client.chat.completions.create(
+        model=model,
+        max_tokens=4096,
+        messages=[{"role": "user", "content": [*image_contents, {"type": "text", "text": EXTRACTION_PROMPT}]}],
+    )
+    return response.choices[0].message.content or ""
+
+
+def parse_screenshots(
+    images_b64: list[str],
+    provider: str = "anthropic",
+    api_key: str = "",
+    base_url: str = "",
+    model: str = "",
+) -> tuple[dict[str, Any], list[str]]:
+    """解析截图，返回结构化数据和不确定字段列表。"""
+    if not images_b64:
+        raise AIParserError("至少需要一张截图")
+
+    if not api_key and provider == "anthropic":
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+
+    if not api_key:
+        raise AIParserError("未配置 API Key，请在设置页面配置")
+
+    if provider == "anthropic":
+        model = model or "claude-sonnet-4-20250514"
+        raw_text = _parse_with_anthropic(images_b64, api_key, model)
+    else:
+        if not base_url:
+            raise AIParserError("OpenAI 兼容模式需要填写 API 地址")
+        if not model:
+            raise AIParserError("请填写模型名称")
+        raw_text = _parse_with_openai_compatible(images_b64, api_key, base_url, model)
+
+    parsed = _parse_json_response(raw_text)
     uncertain_fields = _extract_uncertain_fields(parsed)
     return parsed, uncertain_fields
